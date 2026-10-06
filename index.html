@@ -27,6 +27,16 @@
                 <input type="range" id="impulse" min="10" max="100" value="50" step="1">
             </div>
 
+            <div class="control-group">
+                <label for="count">Количество спутников: <span id="count-value">3</span></label>
+                <input type="range" id="count" min="1" max="8" value="3" step="1">
+            </div>
+
+            <div class="control-group">
+                <label for="interval">Интервал запуска: <span id="interval-value">4</span> с</label>
+                <input type="range" id="interval" min="1" max="15" value="4" step="1">
+            </div>
+
             <div class="button-row">
                 <button id="start-btn">Запуск</button>
                 <button id="reset-btn">Заново</button>
@@ -35,7 +45,8 @@
 
         <section id="telemetry">
             <div>Время: <span id="time-value">0.0</span> с</div>
-            <div>Статус: <span id="status-value">Ожидание</span></div>
+            <div>Запущено: <span id="launched-value">0 / 3</span></div>
+            <div>Столкновений: <span id="collision-value">0</span></div>
         </section>
 
         <div id="result-screen" class="hidden">
