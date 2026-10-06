@@ -140,10 +140,18 @@ html, body {
 #telemetry {
     display: flex;
     justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 5px;
     padding: 8px;
-    font-size: 13px;
+    font-size: 12px;
     background: #001133;
     border-top: 1px solid #003366;
+    text-align: center;
+}
+
+#telemetry > div {
+    flex: 1 1 auto;
+    min-width: 90px;
 }
 
 #telemetry span {
