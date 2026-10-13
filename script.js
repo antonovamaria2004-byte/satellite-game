@@ -13,10 +13,13 @@
     const intervalSlider = document.getElementById('interval');
     const intervalValue = document.getElementById('interval-value');
     const startBtn = document.getElementById('start-btn');
+    const correctBtn = document.getElementById('correct-btn');
     const resetBtn = document.getElementById('reset-btn');
     const timeValue = document.getElementById('time-value');
     const launchedValue = document.getElementById('launched-value');
     const collisionValue = document.getElementById('collision-value');
+    const selectedInfo = document.getElementById('selected-info');
+    const selectedValue = document.getElementById('selected-value');
     const resultScreen = document.getElementById('result-screen');
     const resultTitle = document.getElementById('result-title');
     const resultText = document.getElementById('result-text');
@@ -35,7 +38,8 @@
         lastLaunchTime: 0,
         satellites: [],
         collisions: 0,
-        earthRadius: 60
+        earthRadius: 60,
+        selectedSatellite: null
     };
 
     // --- Настройка размеров canvas ---
@@ -57,7 +61,8 @@
             angle: startAngle,
             radius: startRadius,
             targetRadius: game.earthRadius + game.targetAltitude / 10,
-            speed: 0.8 + impulseFactor * 1.2,
+            baseSpeed: 0.8 + impulseFactor * 1.2,
+            speedMultiplier: 1.0,
             highlighted: false
         };
     }
@@ -68,7 +73,6 @@
 
         game.time += dt;
 
-        // Запуск новых спутников по интервалу
         if (game.satellites.length < game.totalSatellites &&
             game.time - game.lastLaunchTime >= game.launchInterval) {
             const newSat = createSatellite(game.satellites.length);
@@ -77,26 +81,42 @@
             launchedValue.textContent = game.satellites.length + ' / ' + game.totalSatellites;
         }
 
-        // Обновление каждого спутника
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
-            sat.angle += sat.speed * dt;
+            const speed = sat.baseSpeed * sat.speedMultiplier;
+            sat.angle += speed * dt;
             if (sat.angle > Math.PI * 2) sat.angle -= Math.PI * 2;
 
             const diff = sat.targetRadius - sat.radius;
             sat.radius += diff * 0.5 * dt;
         }
 
-        // Проверка столкновений
         checkCollisions();
+        updateSelectedInfo();
 
-        // Обновление времени
         timeValue.textContent = game.time.toFixed(1);
 
-        // Проверка завершения миссии
         if (game.satellites.length >= game.totalSatellites && game.time >= game.flightTimeLimit) {
             finishGame();
         }
+    }
+
+    // --- Информация о выбранном спутнике ---
+    function updateSelectedInfo() {
+        if (!game.selectedSatellite) {
+            selectedInfo.classList.add('hidden');
+            return;
+        }
+        const sat = game.selectedSatellite;
+        if (game.satellites.indexOf(sat) === -1) {
+            clearSelection();
+            return;
+        }
+        const altitudeKm = Math.round((sat.radius - game.earthRadius) * 10);
+        const speedPercent = Math.round(sat.speedMultiplier * 100);
+        selectedValue.textContent =
+            'SAT-' + sat.id + ' | Высота: ' + altitudeKm + ' км | Скорость: ' + speedPercent + '%';
+        selectedInfo.classList.remove('hidden');
     }
 
     // --- Проверка столкновений ---
@@ -163,16 +183,24 @@
             const y = cy + Math.sin(sat.angle) * sat.radius;
 
             ctx.beginPath();
-            ctx.arc(x, y, 6, 0, Math.PI * 2);
-            ctx.fillStyle = sat.highlighted ? '#ffffff' : '#00ffff';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00ffff';
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.fillStyle = sat === game.selectedSatellite ? '#ffffff' : '#00ffff';
+            ctx.shadowBlur = sat === game.selectedSatellite ? 25 : 15;
+            ctx.shadowColor = sat === game.selectedSatellite ? '#ffffff' : '#00ffff';
             ctx.fill();
             ctx.shadowBlur = 0;
 
+            if (sat === game.selectedSatellite) {
+                ctx.beginPath();
+                ctx.arc(x, y, 12, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
             ctx.fillStyle = '#ffffff';
             ctx.font = '10px Courier New';
-            ctx.fillText('SAT-' + sat.id, x + 8, y + 4);
+            ctx.fillText('SAT-' + sat.id, x + 10, y + 4);
         }
     }
 
@@ -186,6 +214,59 @@
         render();
 
         requestAnimationFrame(loop);
+    }
+
+    // --- Клик по canvas ---
+    function handleCanvasClick(event) {
+        if (!game.running || game.finished) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const clickY = event.clientY - rect.top;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        let found = null;
+        for (let i = 0; i < game.satellites.length; i++) {
+            const sat = game.satellites[i];
+            const x = cx + Math.cos(sat.angle) * sat.radius;
+            const y = cy + Math.sin(sat.angle) * sat.radius;
+            const dist = Math.sqrt((clickX - x) ** 2 + (clickY - y) ** 2);
+            if (dist < 20) {
+                found = sat;
+                break;
+            }
+        }
+
+        if (found) {
+            if (game.selectedSatellite === found) {
+                clearSelection();
+            } else {
+                game.selectedSatellite = found;
+                correctBtn.disabled = false;
+            }
+        } else {
+            clearSelection();
+        }
+
+        updateSelectedInfo();
+    }
+
+    // --- Очистка выбора ---
+    function clearSelection() {
+        game.selectedSatellite = null;
+        correctBtn.disabled = true;
+        selectedInfo.classList.add('hidden');
+    }
+
+    // --- Коррекция скорости ---
+    function correctSelected() {
+        if (!game.selectedSatellite) return;
+        game.selectedSatellite.speedMultiplier = Math.min(
+            2.0,
+            game.selectedSatellite.speedMultiplier + 0.1
+        );
+        updateSelectedInfo();
     }
 
     // --- Завершение игры ---
@@ -216,6 +297,7 @@
 
         resultScreen.classList.remove('hidden');
         startBtn.disabled = true;
+        clearSelection();
     }
 
     // --- Запуск миссии ---
@@ -238,6 +320,7 @@
         collisionValue.style.color = '#00ffff';
         launchedValue.textContent = '0 / ' + game.totalSatellites;
         startBtn.disabled = true;
+        clearSelection();
 
         lastTime = performance.now();
     }
@@ -257,6 +340,7 @@
         collisionValue.textContent = '0';
         collisionValue.style.color = '#00ffff';
         startBtn.disabled = false;
+        clearSelection();
 
         render();
     }
@@ -280,8 +364,18 @@
     });
 
     startBtn.addEventListener('click', startGame);
+    correctBtn.addEventListener('click', correctSelected);
     resetBtn.addEventListener('click', resetGame);
     resultResetBtn.addEventListener('click', resetGame);
+
+    // --- Клик и тап по canvas ---
+    canvas.addEventListener('click', handleCanvasClick);
+    canvas.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            handleCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+        }
+    }, { passive: true });
 
     // --- Управление с клавиатуры ---
     document.addEventListener('keydown', function (e) {
@@ -306,6 +400,9 @@
             e.preventDefault();
         } else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
             resetGame();
+            e.preventDefault();
+        } else if (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') {
+            correctSelected();
             e.preventDefault();
         }
     });
