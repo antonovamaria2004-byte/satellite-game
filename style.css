@@ -45,6 +45,7 @@ html, body {
     display: block;
     width: 100%;
     height: 100%;
+    touch-action: manipulation;
 }
 
 #controls {
@@ -104,13 +105,13 @@ html, body {
 
 .button-row {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 .button-row button {
     flex: 1;
-    padding: 14px;
-    font-size: 15px;
+    padding: 14px 6px;
+    font-size: 13px;
     font-weight: bold;
     text-transform: uppercase;
     color: #ffffff;
@@ -156,6 +157,22 @@ html, body {
 
 #telemetry span {
     color: #00ffff;
+}
+
+#selected-info {
+    flex: 1 1 100%;
+    color: #00ffff;
+    padding-top: 4px;
+    border-top: 1px dashed #003366;
+    margin-top: 4px;
+}
+
+#selected-info.hidden {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
 }
 
 #result-screen {
@@ -216,8 +233,8 @@ html, body {
         font-size: 12px;
     }
     .button-row button {
-        padding: 16px;
-        font-size: 14px;
+        padding: 16px 4px;
+        font-size: 12px;
     }
     #telemetry {
         font-size: 12px;
