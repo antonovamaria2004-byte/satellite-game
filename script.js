@@ -1,6 +1,17 @@
 (function () {
     'use strict';
 
+    // ============================================================
+    // КАМПАНИЯ: список миссий
+    // ============================================================
+    const CAMPAIGN = [
+        { count: 2, interval: 5, altitude: 300, title: 'Запустить 2 спутника' },
+        { count: 3, interval: 4, altitude: 400, title: 'Запустить 3 спутника' },
+        { count: 4, interval: 3, altitude: 450, title: 'Запустить 4 спутника' },
+        { count: 5, interval: 2, altitude: 500, title: 'Запустить 5 спутников' },
+        { count: 6, interval: 2, altitude: 550, title: 'Запустить 6 спутников' }
+    ];
+
     // --- Получение элементов DOM ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
@@ -15,6 +26,8 @@
     const startBtn = document.getElementById('start-btn');
     const correctBtn = document.getElementById('correct-btn');
     const resetBtn = document.getElementById('reset-btn');
+    const resetCampaignBtn = document.getElementById('reset-campaign-btn');
+    const missionInfo = document.getElementById('mission-info');
     const timeValue = document.getElementById('time-value');
     const launchedValue = document.getElementById('launched-value');
     const collisionValue = document.getElementById('collision-value');
@@ -24,6 +37,7 @@
     const resultScreen = document.getElementById('result-screen');
     const resultTitle = document.getElementById('result-title');
     const resultText = document.getElementById('result-text');
+    const resultNextBtn = document.getElementById('result-next-btn');
     const resultResetBtn = document.getElementById('result-reset-btn');
 
     // --- Состояние игры ---
@@ -32,23 +46,77 @@
         finished: false,
         time: 0,
         flightTimeLimit: 30,
-        targetAltitude: 400,
+        targetAltitude: 300,
         impulse: 50,
-        totalSatellites: 3,
-        launchInterval: 4,
+        totalSatellites: 2,
+        launchInterval: 5,
         lastLaunchTime: 0,
         satellites: [],
         collisions: 0,
         earthRadius: 60,
         selectedSatellite: null,
         stars: [],
-        totalDV: 0
+        totalDV: 0,
+        currentLevel: 0
     };
 
-    // Сколько топлива тратится на одно нажатие «Коррекция»
     const DV_PER_CORRECTION = 10;
 
-    // --- Создание звёзд ---
+    // ============================================================
+    // СОХРАНЕНИЕ ПРОГРЕССА
+    // ============================================================
+    function loadProgress() {
+        try {
+            const saved = localStorage.getItem('satellite_campaign_level');
+            if (saved !== null) {
+                const level = parseInt(saved, 10);
+                if (level >= 0 && level < CAMPAIGN.length) {
+                    game.currentLevel = level;
+                }
+            }
+        } catch (e) {
+            game.currentLevel = 0;
+        }
+    }
+
+    function saveProgress() {
+        try {
+            localStorage.setItem('satellite_campaign_level', game.currentLevel);
+        } catch (e) {
+            // Игнорируем ошибки localStorage
+        }
+    }
+
+    // ============================================================
+    // ПРИМЕНЕНИЕ УРОВНЯ
+    // ============================================================
+    function applyLevel() {
+        const level = CAMPAIGN[game.currentLevel];
+        if (!level) return;
+
+        altitudeSlider.value = level.altitude;
+        altitudeValue.textContent = level.altitude;
+
+        countSlider.value = level.count;
+        countValue.textContent = level.count;
+
+        intervalSlider.value = level.interval;
+        intervalValue.textContent = level.interval;
+
+        game.totalSatellites = level.count;
+        game.targetAltitude = level.altitude;
+        game.launchInterval = level.interval;
+
+        missionInfo.textContent =
+            'Миссия ' + (game.currentLevel + 1) + ' / ' + CAMPAIGN.length +
+            ' — ' + level.title;
+
+        launchedValue.textContent = '0 / ' + level.count;
+    }
+
+    // ============================================================
+    // ЗВЁЗДЫ
+    // ============================================================
     function createStars() {
         const count = 150;
         game.stars = [];
@@ -63,7 +131,7 @@
         }
     }
 
-    // --- Настройка размеров canvas ---
+    // --- Размеры canvas ---
     function resizeCanvas() {
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width;
@@ -96,7 +164,7 @@
         };
     }
 
-    // --- Обновление логики ---
+    // --- Логика ---
     function update(dt) {
         if (!game.running || game.finished) return;
 
@@ -158,7 +226,7 @@
         selectedInfo.classList.remove('hidden');
     }
 
-    // --- Проверка столкновений ---
+    // --- Столкновения ---
     function checkCollisions() {
         for (let i = 0; i < game.satellites.length; i++) {
             for (let j = i + 1; j < game.satellites.length; j++) {
@@ -189,7 +257,7 @@
 
         ctx.clearRect(0, 0, w, h);
 
-        // --- Звёздный фон ---
+        // Звёзды
         const timeSec = performance.now() / 1000;
         for (let i = 0; i < game.stars.length; i++) {
             const star = game.stars[i];
@@ -213,7 +281,7 @@
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Свечение атмосферы
+        // Атмосфера
         const grad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 40);
         grad.addColorStop(0, 'rgba(0, 255, 255, 0.15)');
         grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
@@ -236,7 +304,7 @@
             }
         }
 
-        // --- Угловое расстояние ---
+        // Угловое расстояние
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
@@ -280,7 +348,7 @@
             }
         }
 
-        // --- Следы ---
+        // Следы
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             for (let t = 0; t < sat.trail.length; t++) {
@@ -299,22 +367,16 @@
             }
         }
 
-        // --- Спутники ---
+        // Спутники
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             const x = cx + Math.cos(sat.angle) * sat.radius;
             const y = cy + Math.sin(sat.angle) * sat.radius;
 
             let satColor = '#00ffff';
-            if (sat.fuel <= 20) {
-                satColor = '#ffaa00';
-            }
-            if (sat.fuel <= 0) {
-                satColor = '#ff4444';
-            }
-            if (sat === game.selectedSatellite) {
-                satColor = '#ffffff';
-            }
+            if (sat.fuel <= 20) satColor = '#ffaa00';
+            if (sat.fuel <= 0) satColor = '#ff4444';
+            if (sat === game.selectedSatellite) satColor = '#ffffff';
 
             ctx.beginPath();
             ctx.arc(x, y, 8, 0, Math.PI * 2);
@@ -393,22 +455,19 @@
         selectedInfo.classList.add('hidden');
     }
 
-    // --- Коррекция скорости с расходом топлива ---
+    // --- Коррекция ---
     function correctSelected() {
         if (!game.selectedSatellite) return;
-
         const sat = game.selectedSatellite;
 
         if (sat.fuel < DV_PER_CORRECTION) {
-            selectedValue.textContent =
-                'SAT-' + sat.id + ' | ТОПЛИВО ИСЧЕРПАНО!';
+            selectedValue.textContent = 'SAT-' + sat.id + ' | ТОПЛИВО ИСЧЕРПАНО!';
             return;
         }
 
         sat.fuel -= DV_PER_CORRECTION;
         sat.spentDV += DV_PER_CORRECTION;
         game.totalDV += DV_PER_CORRECTION;
-
         sat.speedMultiplier = Math.min(2.0, sat.speedMultiplier + 0.1);
 
         updateSelectedInfo();
@@ -460,12 +519,24 @@
             'Бонус за высоты: ' + altitudeBonus + '<br>' +
             'Бонус за экономию: ' + fuelBonus;
 
+        const hasNext = game.currentLevel < CAMPAIGN.length - 1;
+        if (success && hasNext) {
+            resultNextBtn.classList.remove('hidden');
+        } else {
+            resultNextBtn.classList.add('hidden');
+        }
+
+        if (success && hasNext) {
+            game.currentLevel++;
+            saveProgress();
+        }
+
         resultScreen.classList.remove('hidden');
         startBtn.disabled = true;
         clearSelection();
     }
 
-    // --- Запуск миссии ---
+    // --- Старт миссии ---
     function startGame() {
         if (game.running) return;
 
@@ -492,7 +563,7 @@
         lastTime = performance.now();
     }
 
-    // --- Сброс ---
+    // --- Сброс миссии ---
     function resetGame() {
         game.running = false;
         game.finished = false;
@@ -514,7 +585,23 @@
         render();
     }
 
-    // --- Обработчики UI ---
+    // --- Следующая миссия ---
+    function nextMission() {
+        resultScreen.classList.add('hidden');
+        applyLevel();
+        resetGame();
+    }
+
+    // --- Сброс кампании ---
+    function resetCampaign() {
+        if (!confirm('Начать кампанию с первого уровня?')) return;
+        game.currentLevel = 0;
+        saveProgress();
+        applyLevel();
+        resetGame();
+    }
+
+    // --- Обработчики ---
     altitudeSlider.addEventListener('input', function () {
         altitudeValue.textContent = this.value;
     });
@@ -535,9 +622,11 @@
     startBtn.addEventListener('click', startGame);
     correctBtn.addEventListener('click', correctSelected);
     resetBtn.addEventListener('click', resetGame);
+    resetCampaignBtn.addEventListener('click', resetCampaign);
     resultResetBtn.addEventListener('click', resetGame);
+    resultNextBtn.addEventListener('click', nextMission);
 
-    // --- Клик и тап по canvas ---
+    // --- Клик и тап ---
     canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('touchstart', function (e) {
         if (e.touches.length === 1) {
@@ -546,7 +635,7 @@
         }
     }, { passive: true });
 
-    // --- Управление с клавиатуры ---
+    // --- Клавиатура ---
     document.addEventListener('keydown', function (e) {
         if (e.key === 'ArrowUp') {
             altitudeSlider.value = Math.min(800, parseInt(altitudeSlider.value, 10) + 10);
@@ -574,10 +663,3 @@
             correctSelected();
             e.preventDefault();
         }
-    });
-
-    // --- Инициализация ---
-    createStars();
-    resizeCanvas();
-    requestAnimationFrame(loop);
-})();
