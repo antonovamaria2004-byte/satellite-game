@@ -18,6 +18,7 @@
     const timeValue = document.getElementById('time-value');
     const launchedValue = document.getElementById('launched-value');
     const collisionValue = document.getElementById('collision-value');
+    const dvValue = document.getElementById('dv-value');
     const selectedInfo = document.getElementById('selected-info');
     const selectedValue = document.getElementById('selected-value');
     const resultScreen = document.getElementById('result-screen');
@@ -40,8 +41,12 @@
         collisions: 0,
         earthRadius: 60,
         selectedSatellite: null,
-        stars: []
+        stars: [],
+        totalDV: 0
     };
+
+    // Сколько топлива тратится на одно нажатие «Коррекция»
+    const DV_PER_CORRECTION = 10;
 
     // --- Создание звёзд ---
     function createStars() {
@@ -73,8 +78,6 @@
         const startRadius = 40 + impulseFactor * 60;
         const startAngle = (Math.PI * 2 / game.totalSatellites) * index;
 
-        // Смещение высоты: каждый следующий спутник выше на 30 км
-        // При 5+ спутниках шаг уменьшаем, чтобы не улететь за экран
         const heightStep = game.totalSatellites > 4 ? 20 : 30;
         const altitudeOffset = index * heightStep;
 
@@ -86,6 +89,8 @@
             altitudeOffset: altitudeOffset,
             baseSpeed: 0.8 + impulseFactor * 1.2,
             speedMultiplier: 1.0,
+            fuel: 100,
+            spentDV: 0,
             highlighted: false,
             trail: []
         };
@@ -124,6 +129,7 @@
         updateSelectedInfo();
 
         timeValue.textContent = game.time.toFixed(1);
+        dvValue.textContent = game.totalDV;
 
         if (game.satellites.length >= game.totalSatellites && game.time >= game.flightTimeLimit) {
             finishGame();
@@ -144,7 +150,11 @@
         const altitudeKm = Math.round((sat.radius - game.earthRadius) * 10);
         const speedPercent = Math.round(sat.speedMultiplier * 100);
         selectedValue.textContent =
-            'SAT-' + sat.id + ' | Высота: ' + altitudeKm + ' км | Скорость: ' + speedPercent + '%';
+            'SAT-' + sat.id +
+            ' | Высота: ' + altitudeKm + ' км' +
+            ' | Скорость: ' + speedPercent + '%' +
+            ' | Топливо: ' + sat.fuel + ' ед.' +
+            ' | ΔV: ' + sat.spentDV;
         selectedInfo.classList.remove('hidden');
     }
 
@@ -212,7 +222,7 @@
         ctx.arc(cx, cy, game.earthRadius + 40, 0, Math.PI * 2);
         ctx.fill();
 
-        // Целевые орбиты (пунктир для каждой)
+        // Целевые орбиты
         if (game.running && game.satellites.length > 0) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const targetR = game.satellites[i].targetRadius;
@@ -226,7 +236,7 @@
             }
         }
 
-        // --- Угловое расстояние между соседними спутниками ---
+        // --- Угловое расстояние ---
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
@@ -270,7 +280,7 @@
             }
         }
 
-        // --- Следы спутников ---
+        // --- Следы ---
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             for (let t = 0; t < sat.trail.length; t++) {
@@ -295,11 +305,22 @@
             const x = cx + Math.cos(sat.angle) * sat.radius;
             const y = cy + Math.sin(sat.angle) * sat.radius;
 
+            let satColor = '#00ffff';
+            if (sat.fuel <= 20) {
+                satColor = '#ffaa00';
+            }
+            if (sat.fuel <= 0) {
+                satColor = '#ff4444';
+            }
+            if (sat === game.selectedSatellite) {
+                satColor = '#ffffff';
+            }
+
             ctx.beginPath();
             ctx.arc(x, y, 8, 0, Math.PI * 2);
-            ctx.fillStyle = sat === game.selectedSatellite ? '#ffffff' : '#00ffff';
+            ctx.fillStyle = satColor;
             ctx.shadowBlur = sat === game.selectedSatellite ? 25 : 15;
-            ctx.shadowColor = sat === game.selectedSatellite ? '#ffffff' : '#00ffff';
+            ctx.shadowColor = satColor;
             ctx.fill();
             ctx.shadowBlur = 0;
 
@@ -372,13 +393,24 @@
         selectedInfo.classList.add('hidden');
     }
 
-    // --- Коррекция скорости ---
+    // --- Коррекция скорости с расходом топлива ---
     function correctSelected() {
         if (!game.selectedSatellite) return;
-        game.selectedSatellite.speedMultiplier = Math.min(
-            2.0,
-            game.selectedSatellite.speedMultiplier + 0.1
-        );
+
+        const sat = game.selectedSatellite;
+
+        if (sat.fuel < DV_PER_CORRECTION) {
+            selectedValue.textContent =
+                'SAT-' + sat.id + ' | ТОПЛИВО ИСЧЕРПАНО!';
+            return;
+        }
+
+        sat.fuel -= DV_PER_CORRECTION;
+        sat.spentDV += DV_PER_CORRECTION;
+        game.totalDV += DV_PER_CORRECTION;
+
+        sat.speedMultiplier = Math.min(2.0, sat.speedMultiplier + 0.1);
+
         updateSelectedInfo();
     }
 
@@ -389,7 +421,6 @@
 
         const success = game.collisions === 0 && game.satellites.length === game.totalSatellites;
 
-        // Бонус за распределение по разным высотам
         let altitudeBonus = 0;
         if (game.satellites.length === game.totalSatellites) {
             const altitudes = game.satellites.map(s => Math.round(s.radius));
@@ -399,17 +430,22 @@
             }
         }
 
-        const score = (game.satellites.length * 100) - (game.collisions * 200) + altitudeBonus;
+        const fuelBonus = Math.max(0, 100 - game.totalDV);
+
+        const score = (game.satellites.length * 100)
+                    - (game.collisions * 200)
+                    + altitudeBonus
+                    + fuelBonus;
 
         let message = '';
         if (success && altitudeBonus > 0) {
-            message = 'Все ' + game.totalSatellites + ' спутников выведены на разные орбиты без столкновений! +бонус 50.';
+            message = 'Все спутники выведены на разные орбиты без столкновений!';
         } else if (success) {
-            message = 'Все ' + game.totalSatellites + ' спутников успешно выведены на орбиту без столкновений!';
+            message = 'Все спутники успешно выведены на орбиту без столкновений!';
         } else if (game.collisions > 0) {
-            message = 'Зафиксировано столкновений: ' + game.collisions + '. Требуется корректировка интервалов.';
+            message = 'Зафиксировано столкновений: ' + game.collisions + '.';
         } else {
-            message = 'Не все спутники выведены. Увеличьте время полёта или уменьшите интервал.';
+            message = 'Не все спутники выведены.';
         }
 
         resultTitle.textContent = success ? 'УСПЕХ' : 'НЕУДАЧА';
@@ -418,8 +454,11 @@
             message + '<br><br>' +
             '<strong>Итоговый балл:</strong> ' + score + '<br>' +
             'Время миссии: ' + game.time.toFixed(1) + ' с<br>' +
-            'Запущено спутников: ' + game.satellites.length + ' / ' + game.totalSatellites + '<br>' +
-            'Столкновений: ' + game.collisions;
+            'Запущено: ' + game.satellites.length + ' / ' + game.totalSatellites + '<br>' +
+            'Столкновений: ' + game.collisions + '<br>' +
+            'Суммарный ΔV: ' + game.totalDV + '<br>' +
+            'Бонус за высоты: ' + altitudeBonus + '<br>' +
+            'Бонус за экономию: ' + fuelBonus;
 
         resultScreen.classList.remove('hidden');
         startBtn.disabled = true;
@@ -440,10 +479,12 @@
         game.launchInterval = parseInt(intervalSlider.value, 10);
         game.satellites = [];
         game.collisions = 0;
+        game.totalDV = 0;
 
         resultScreen.classList.add('hidden');
         collisionValue.textContent = '0';
         collisionValue.style.color = '#00ffff';
+        dvValue.textContent = '0';
         launchedValue.textContent = '0 / ' + game.totalSatellites;
         startBtn.disabled = true;
         clearSelection();
@@ -459,12 +500,14 @@
         game.lastLaunchTime = 0;
         game.satellites = [];
         game.collisions = 0;
+        game.totalDV = 0;
 
         resultScreen.classList.add('hidden');
         timeValue.textContent = '0.0';
         launchedValue.textContent = '0 / ' + parseInt(countSlider.value, 10);
         collisionValue.textContent = '0';
         collisionValue.style.color = '#00ffff';
+        dvValue.textContent = '0';
         startBtn.disabled = false;
         clearSelection();
 
