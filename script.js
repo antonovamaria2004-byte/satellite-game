@@ -72,11 +72,18 @@
         const impulseFactor = game.impulse / 100;
         const startRadius = 40 + impulseFactor * 60;
         const startAngle = (Math.PI * 2 / game.totalSatellites) * index;
+
+        // Смещение высоты: каждый следующий спутник выше на 30 км
+        // При 5+ спутниках шаг уменьшаем, чтобы не улететь за экран
+        const heightStep = game.totalSatellites > 4 ? 20 : 30;
+        const altitudeOffset = index * heightStep;
+
         return {
             id: index + 1,
             angle: startAngle,
             radius: startRadius,
-            targetRadius: game.earthRadius + game.targetAltitude / 10,
+            targetRadius: game.earthRadius + (game.targetAltitude + altitudeOffset) / 10,
+            altitudeOffset: altitudeOffset,
             baseSpeed: 0.8 + impulseFactor * 1.2,
             speedMultiplier: 1.0,
             highlighted: false,
@@ -107,7 +114,6 @@
             const diff = sat.targetRadius - sat.radius;
             sat.radius += diff * 0.5 * dt;
 
-            // Записываем точку в след
             sat.trail.push({ angle: sat.angle, radius: sat.radius });
             if (sat.trail.length > 40) {
                 sat.trail.shift();
@@ -206,16 +212,18 @@
         ctx.arc(cx, cy, game.earthRadius + 40, 0, Math.PI * 2);
         ctx.fill();
 
-        // Целевая орбита (пунктир)
+        // Целевые орбиты (пунктир для каждой)
         if (game.running && game.satellites.length > 0) {
-            const targetR = game.satellites[0].targetRadius;
-            ctx.beginPath();
-            ctx.setLineDash([5, 5]);
-            ctx.arc(cx, cy, targetR, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.setLineDash([]);
+            for (let i = 0; i < game.satellites.length; i++) {
+                const targetR = game.satellites[i].targetRadius;
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.arc(cx, cy, targetR, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
         }
 
         // --- Угловое расстояние между соседними спутниками ---
@@ -380,10 +388,23 @@
         game.finished = true;
 
         const success = game.collisions === 0 && game.satellites.length === game.totalSatellites;
-        const score = (game.satellites.length * 100) - (game.collisions * 200);
+
+        // Бонус за распределение по разным высотам
+        let altitudeBonus = 0;
+        if (game.satellites.length === game.totalSatellites) {
+            const altitudes = game.satellites.map(s => Math.round(s.radius));
+            const uniqueAltitudes = new Set(altitudes).size;
+            if (uniqueAltitudes === game.totalSatellites) {
+                altitudeBonus = 50;
+            }
+        }
+
+        const score = (game.satellites.length * 100) - (game.collisions * 200) + altitudeBonus;
 
         let message = '';
-        if (success) {
+        if (success && altitudeBonus > 0) {
+            message = 'Все ' + game.totalSatellites + ' спутников выведены на разные орбиты без столкновений! +бонус 50.';
+        } else if (success) {
             message = 'Все ' + game.totalSatellites + ' спутников успешно выведены на орбиту без столкновений!';
         } else if (game.collisions > 0) {
             message = 'Зафиксировано столкновений: ' + game.collisions + '. Требуется корректировка интервалов.';
