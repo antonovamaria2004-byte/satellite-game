@@ -10,6 +10,7 @@
     <div id="game-container">
         <header id="top-bar">
             <h1>Спутниковая группировка</h1>
+            <div id="mission-info">Миссия 1 / 5 — Запустить 2 спутника</div>
         </header>
 
         <main id="game-area">
@@ -18,8 +19,8 @@
 
         <section id="controls">
             <div class="control-group">
-                <label for="altitude">Базовая высота: <span id="altitude-value">400</span> км</label>
-                <input type="range" id="altitude" min="200" max="800" value="400" step="10">
+                <label for="altitude">Базовая высота: <span id="altitude-value">300</span> км</label>
+                <input type="range" id="altitude" min="200" max="800" value="300" step="10">
             </div>
 
             <div class="control-group">
@@ -28,13 +29,13 @@
             </div>
 
             <div class="control-group">
-                <label for="count">Количество спутников: <span id="count-value">3</span></label>
-                <input type="range" id="count" min="1" max="8" value="3" step="1">
+                <label for="count">Количество спутников: <span id="count-value">2</span></label>
+                <input type="range" id="count" min="1" max="8" value="2" step="1">
             </div>
 
             <div class="control-group">
-                <label for="interval">Интервал запуска: <span id="interval-value">4</span> с</label>
-                <input type="range" id="interval" min="1" max="15" value="4" step="1">
+                <label for="interval">Интервал запуска: <span id="interval-value">5</span> с</label>
+                <input type="range" id="interval" min="1" max="15" value="5" step="1">
             </div>
 
             <div class="button-row">
@@ -42,11 +43,15 @@
                 <button id="correct-btn" disabled>Коррекция</button>
                 <button id="reset-btn">Заново</button>
             </div>
+
+            <div class="button-row" style="margin-top: 8px;">
+                <button id="reset-campaign-btn" style="background: #550000; border-color: #ff4444;">Сбросить кампанию</button>
+            </div>
         </section>
 
         <section id="telemetry">
             <div>Время: <span id="time-value">0.0</span> с</div>
-            <div>Запущено: <span id="launched-value">0 / 3</span></div>
+            <div>Запущено: <span id="launched-value">0 / 2</span></div>
             <div>Столкновений: <span id="collision-value">0</span></div>
             <div>ΔV: <span id="dv-value">0</span></div>
             <div id="selected-info" class="hidden">Выбран: <span id="selected-value">—</span></div>
@@ -55,7 +60,10 @@
         <div id="result-screen" class="hidden">
             <h2 id="result-title">Результат</h2>
             <p id="result-text"></p>
-            <button id="result-reset-btn">Заново</button>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="result-next-btn" class="hidden">Следующая миссия</button>
+                <button id="result-reset-btn">Заново</button>
+            </div>
         </div>
     </div>
 
