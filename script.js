@@ -150,6 +150,7 @@
 
         ctx.clearRect(0, 0, w, h);
 
+        // Земля
         ctx.beginPath();
         ctx.arc(cx, cy, game.earthRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#1a4d80';
@@ -158,6 +159,7 @@
         ctx.lineWidth = 2;
         ctx.stroke();
 
+        // Свечение атмосферы
         const grad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 40);
         grad.addColorStop(0, 'rgba(0, 255, 255, 0.15)');
         grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
@@ -166,6 +168,7 @@
         ctx.arc(cx, cy, game.earthRadius + 40, 0, Math.PI * 2);
         ctx.fill();
 
+        // Целевая орбита (пунктир)
         if (game.running && game.satellites.length > 0) {
             const targetR = game.satellites[0].targetRadius;
             ctx.beginPath();
@@ -177,6 +180,51 @@
             ctx.setLineDash([]);
         }
 
+        // --- Угловое расстояние между соседними спутниками ---
+        if (game.satellites.length >= 2) {
+            for (let i = 0; i < game.satellites.length; i++) {
+                const s1 = game.satellites[i];
+                const s2 = game.satellites[(i + 1) % game.satellites.length];
+
+                let angleDiff = Math.abs(s1.angle - s2.angle);
+                if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+
+                const diffDeg = angleDiff * 180 / Math.PI;
+
+                let arcColor = '#00ff00';
+                if (diffDeg < 10) {
+                    arcColor = '#ff4444';
+                } else if (diffDeg < 30) {
+                    arcColor = '#ffaa00';
+                }
+
+                const arcRadius = (s1.radius + s2.radius) / 2;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, arcRadius, s1.angle, s2.angle);
+                ctx.strokeStyle = arcColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                let midAngle = (s1.angle + s2.angle) / 2;
+                if (Math.abs(s1.angle - s2.angle) > Math.PI) {
+                    midAngle = (s1.angle + s2.angle) / 2 + Math.PI;
+                }
+                const tx = cx + Math.cos(midAngle) * arcRadius;
+                const ty = cy + Math.sin(midAngle) * arcRadius;
+
+                ctx.fillStyle = arcColor;
+                ctx.font = 'bold 11px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(diffDeg.toFixed(0) + '°', tx, ty);
+
+                ctx.textAlign = 'start';
+                ctx.textBaseline = 'alphabetic';
+            }
+        }
+
+        // Спутники
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             const x = cx + Math.cos(sat.angle) * sat.radius;
