@@ -663,3 +663,12 @@
             correctSelected();
             e.preventDefault();
         }
+    });
+
+    // --- Инициализация ---
+    createStars();
+    loadProgress();
+    applyLevel();
+    resizeCanvas();
+    requestAnimationFrame(loop);
+})();
