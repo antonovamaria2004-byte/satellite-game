@@ -39,8 +39,24 @@
         satellites: [],
         collisions: 0,
         earthRadius: 60,
-        selectedSatellite: null
+        selectedSatellite: null,
+        stars: []
     };
+
+    // --- Создание звёзд ---
+    function createStars() {
+        const count = 150;
+        game.stars = [];
+        for (let i = 0; i < count; i++) {
+            game.stars.push({
+                x: Math.random(),
+                y: Math.random(),
+                radius: Math.random() * 1.5 + 0.3,
+                phase: Math.random() * Math.PI * 2,
+                speed: Math.random() * 2 + 1
+            });
+        }
+    }
 
     // --- Настройка размеров canvas ---
     function resizeCanvas() {
@@ -63,7 +79,8 @@
             targetRadius: game.earthRadius + game.targetAltitude / 10,
             baseSpeed: 0.8 + impulseFactor * 1.2,
             speedMultiplier: 1.0,
-            highlighted: false
+            highlighted: false,
+            trail: []
         };
     }
 
@@ -89,6 +106,12 @@
 
             const diff = sat.targetRadius - sat.radius;
             sat.radius += diff * 0.5 * dt;
+
+            // Записываем точку в след
+            sat.trail.push({ angle: sat.angle, radius: sat.radius });
+            if (sat.trail.length > 40) {
+                sat.trail.shift();
+            }
         }
 
         checkCollisions();
@@ -149,6 +172,21 @@
         const cy = h / 2;
 
         ctx.clearRect(0, 0, w, h);
+
+        // --- Звёздный фон ---
+        const timeSec = performance.now() / 1000;
+        for (let i = 0; i < game.stars.length; i++) {
+            const star = game.stars[i];
+            const sx = star.x * w;
+            const sy = star.y * h;
+            const twinkle = 0.5 + 0.5 * Math.sin(timeSec * star.speed + star.phase);
+            ctx.globalAlpha = 0.3 + twinkle * 0.7;
+            ctx.beginPath();
+            ctx.arc(sx, sy, star.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
 
         // Земля
         ctx.beginPath();
@@ -224,7 +262,26 @@
             }
         }
 
-        // Спутники
+        // --- Следы спутников ---
+        for (let i = 0; i < game.satellites.length; i++) {
+            const sat = game.satellites[i];
+            for (let t = 0; t < sat.trail.length; t++) {
+                const point = sat.trail[t];
+                const px = cx + Math.cos(point.angle) * point.radius;
+                const py = cy + Math.sin(point.angle) * point.radius;
+                const alpha = (t / sat.trail.length) * 0.5;
+                const size = 1 + (t / sat.trail.length) * 3;
+
+                ctx.beginPath();
+                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.fillStyle = sat === game.selectedSatellite
+                    ? 'rgba(255, 255, 255, ' + alpha + ')'
+                    : 'rgba(0, 255, 255, ' + alpha + ')';
+                ctx.fill();
+            }
+        }
+
+        // --- Спутники ---
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             const x = cx + Math.cos(sat.angle) * sat.radius;
@@ -456,6 +513,7 @@
     });
 
     // --- Инициализация ---
+    createStars();
     resizeCanvas();
     requestAnimationFrame(loop);
 })();
