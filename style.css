@@ -35,6 +35,13 @@ html, body {
     letter-spacing: 1px;
 }
 
+#mission-info {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 4px;
+    letter-spacing: 1px;
+}
+
 #game-area {
     flex: 1;
     position: relative;
@@ -225,9 +232,32 @@ html, body {
     color: #001133;
 }
 
+#result-next-btn {
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #001133;
+    background: #00ff00;
+    border: 1px solid #00ffff;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#result-next-btn.hidden {
+    display: none;
+}
+
+#result-next-btn:active {
+    background: #00ffff;
+}
+
 @media (max-width: 600px) {
     #top-bar h1 {
         font-size: 14px;
+    }
+    #mission-info {
+        font-size: 11px;
     }
     .control-group label {
         font-size: 12px;
