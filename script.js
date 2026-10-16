@@ -12,6 +12,11 @@
         { count: 6, interval: 2, altitude: 550, title: 'Запустить 6 спутников' }
     ];
 
+    // Параметры псевдо-3D
+    const PERSPECTIVE_TILT = 0.45; // насколько сжимаем вертикаль (0 = плоско, 1 = сильно)
+    const SHADOW_OFFSET_X = 3;
+    const SHADOW_OFFSET_Y = 4;
+
     // --- Получение элементов DOM ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
@@ -83,7 +88,6 @@
         try {
             localStorage.setItem('satellite_campaign_level', game.currentLevel);
         } catch (e) {
-            // Игнорируем ошибки localStorage
         }
     }
 
@@ -139,6 +143,29 @@
         render();
     }
     window.addEventListener('resize', resizeCanvas);
+
+    // ============================================================
+    // ПСЕВДО-3D: преобразование координат
+    // ============================================================
+    // Превращаем обычные (x, y) на плоскости в «наклонённые» (screenX, screenY)
+    function toScreen(x, y, cx, cy) {
+        return {
+            sx: cx + x,
+            sy: cy + y * PERSPECTIVE_TILT
+        };
+    }
+
+    // Отрисовка эллипса (орбиты) с наклоном
+    function drawTiltedCircle(cx, cy, radius, strokeStyle, lineWidth, dashed) {
+        ctx.beginPath();
+        if (dashed) ctx.setLineDash([5, 5]);
+        // ctx.ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle)
+        ctx.ellipse(cx, cy, radius, radius * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+        if (dashed) ctx.setLineDash([]);
+    }
 
     // --- Создание спутника ---
     function createSatellite(index) {
@@ -248,7 +275,9 @@
         }
     }
 
-    // --- Отрисовка ---
+    // ============================================================
+    // ОТРИСОВКА (псевдо-3D)
+    // ============================================================
     function render() {
         const w = canvas.width;
         const h = canvas.height;
@@ -257,7 +286,7 @@
 
         ctx.clearRect(0, 0, w, h);
 
-        // Звёзды
+        // --- Звёздный фон ---
         const timeSec = performance.now() / 1000;
         for (let i = 0; i < game.stars.length; i++) {
             const star = game.stars[i];
@@ -272,39 +301,76 @@
         }
         ctx.globalAlpha = 1.0;
 
-        // Земля
+        // --- Тень Земли (под шаром) ---
+        ctx.beginPath();
+        ctx.ellipse(
+            cx + SHADOW_OFFSET_X,
+            cy + game.earthRadius * PERSPECTIVE_TILT + SHADOW_OFFSET_Y,
+            game.earthRadius * 0.95,
+            game.earthRadius * PERSPECTIVE_TILT * 0.6,
+            0, 0, Math.PI * 2
+        );
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fill();
+
+        // --- Земля: объёмный шар ---
+        // Основной градиент (от светлого к тёмному — имитация сферы)
+        const earthGrad = ctx.createRadialGradient(
+            cx - game.earthRadius * 0.4,
+            cy - game.earthRadius * 0.4,
+            game.earthRadius * 0.1,
+            cx,
+            cy,
+            game.earthRadius
+        );
+        earthGrad.addColorStop(0, '#4db8ff');   // блик
+        earthGrad.addColorStop(0.4, '#1a6fb0'); // светлая часть
+        earthGrad.addColorStop(1, '#06243d');   // тёмная сторона
+
         ctx.beginPath();
         ctx.arc(cx, cy, game.earthRadius, 0, Math.PI * 2);
-        ctx.fillStyle = '#1a4d80';
+        ctx.fillStyle = earthGrad;
         ctx.fill();
+
+        // Контур
         ctx.strokeStyle = '#00ffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Атмосфера
-        const grad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 40);
-        grad.addColorStop(0, 'rgba(0, 255, 255, 0.15)');
-        grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
-        ctx.fillStyle = grad;
+        // Блик (маленькое светлое пятно в верхнем левом углу)
+        const highlightGrad = ctx.createRadialGradient(
+            cx - game.earthRadius * 0.45,
+            cy - game.earthRadius * 0.45,
+            0,
+            cx - game.earthRadius * 0.45,
+            cy - game.earthRadius * 0.45,
+            game.earthRadius * 0.4
+        );
+        highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
         ctx.beginPath();
-        ctx.arc(cx, cy, game.earthRadius + 40, 0, Math.PI * 2);
+        ctx.arc(cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, game.earthRadius * 0.4, 0, Math.PI * 2);
+        ctx.fillStyle = highlightGrad;
         ctx.fill();
 
-        // Целевые орбиты
+        // Атмосферный ореол
+        const haloGrad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 40);
+        haloGrad.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+        haloGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, game.earthRadius + 40, 0, Math.PI * 2);
+        ctx.fillStyle = haloGrad;
+        ctx.fill();
+
+        // --- Целевые орбиты (эллипсы) ---
         if (game.running && game.satellites.length > 0) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const targetR = game.satellites[i].targetRadius;
-                ctx.beginPath();
-                ctx.setLineDash([5, 5]);
-                ctx.arc(cx, cy, targetR, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.25)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.setLineDash([]);
+                drawTiltedCircle(cx, cy, targetR, 'rgba(0, 255, 255, 0.25)', 1, true);
             }
         }
 
-        // Угловое расстояние
+        // --- Угловое расстояние (по эллипсу) ---
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
@@ -324,18 +390,22 @@
 
                 const arcRadius = (s1.radius + s2.radius) / 2;
 
+                // Рисуем дугу как эллипс
                 ctx.beginPath();
-                ctx.arc(cx, cy, arcRadius, s1.angle, s2.angle);
+                ctx.ellipse(cx, cy, arcRadius, arcRadius * PERSPECTIVE_TILT, 0, s1.angle, s2.angle);
                 ctx.strokeStyle = arcColor;
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
+                // Подпись
                 let midAngle = (s1.angle + s2.angle) / 2;
                 if (Math.abs(s1.angle - s2.angle) > Math.PI) {
                     midAngle = (s1.angle + s2.angle) / 2 + Math.PI;
                 }
+
+                // Позиция подписи на эллипсе
                 const tx = cx + Math.cos(midAngle) * arcRadius;
-                const ty = cy + Math.sin(midAngle) * arcRadius;
+                const ty = cy + Math.sin(midAngle) * arcRadius * PERSPECTIVE_TILT;
 
                 ctx.fillStyle = arcColor;
                 ctx.font = 'bold 11px Courier New';
@@ -348,18 +418,18 @@
             }
         }
 
-        // Следы
+        // --- Следы (сужающиеся к дальнему краю) ---
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             for (let t = 0; t < sat.trail.length; t++) {
                 const point = sat.trail[t];
                 const px = cx + Math.cos(point.angle) * point.radius;
-                const py = cy + Math.sin(point.angle) * point.radius;
+                const py = cy + Math.sin(point.angle) * point.radius * PERSPECTIVE_TILT;
                 const alpha = (t / sat.trail.length) * 0.5;
-                const size = 1 + (t / sat.trail.length) * 3;
+                const size = (1 + (t / sat.trail.length) * 3) * (1 + Math.sin(point.angle) * 0.3);
 
                 ctx.beginPath();
-                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.arc(px, py, Math.max(0.5, size), 0, Math.PI * 2);
                 ctx.fillStyle = sat === game.selectedSatellite
                     ? 'rgba(255, 255, 255, ' + alpha + ')'
                     : 'rgba(0, 255, 255, ' + alpha + ')';
@@ -367,25 +437,47 @@
             }
         }
 
-        // Спутники
+        // --- Спутники с тенями и объёмом ---
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
-            const x = cx + Math.cos(sat.angle) * sat.radius;
-            const y = cy + Math.sin(sat.angle) * sat.radius;
 
+            // Позиция спутника на эллипсе
+            const x = cx + Math.cos(sat.angle) * sat.radius;
+            const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
+
+            // Тень (овал под спутником)
+            ctx.beginPath();
+            ctx.ellipse(x + 2, y + 4, 7, 4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fill();
+
+            // Цвет спутника
             let satColor = '#00ffff';
             if (sat.fuel <= 20) satColor = '#ffaa00';
             if (sat.fuel <= 0) satColor = '#ff4444';
             if (sat === game.selectedSatellite) satColor = '#ffffff';
 
-            ctx.beginPath();
-            ctx.arc(x, y, 8, 0, Math.PI * 2);
-            ctx.fillStyle = satColor;
+            // Тень свечения
             ctx.shadowBlur = sat === game.selectedSatellite ? 25 : 15;
             ctx.shadowColor = satColor;
+
+            // Основной круг спутника (объём через радиальный градиент)
+            const satGrad = ctx.createRadialGradient(
+                x - 3, y - 3, 1,
+                x, y, 8
+            );
+            satGrad.addColorStop(0, '#ffffff');
+            satGrad.addColorStop(0.5, satColor);
+            satGrad.addColorStop(1, satColor);
+
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.fillStyle = satGrad;
             ctx.fill();
+
             ctx.shadowBlur = 0;
 
+            // Кольцо вокруг выбранного
             if (sat === game.selectedSatellite) {
                 ctx.beginPath();
                 ctx.arc(x, y, 12, 0, Math.PI * 2);
@@ -394,6 +486,7 @@
                 ctx.stroke();
             }
 
+            // Подпись
             ctx.fillStyle = '#ffffff';
             ctx.font = '10px Courier New';
             ctx.fillText('SAT-' + sat.id, x + 10, y + 4);
@@ -412,7 +505,7 @@
         requestAnimationFrame(loop);
     }
 
-    // --- Клик по canvas ---
+    // --- Клик по canvas (с учётом эллипса) ---
     function handleCanvasClick(event) {
         if (!game.running || game.finished) return;
 
@@ -426,7 +519,7 @@
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             const x = cx + Math.cos(sat.angle) * sat.radius;
-            const y = cy + Math.sin(sat.angle) * sat.radius;
+            const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
             const dist = Math.sqrt((clickX - x) ** 2 + (clickY - y) ** 2);
             if (dist < 20) {
                 found = sat;
@@ -448,7 +541,6 @@
         updateSelectedInfo();
     }
 
-    // --- Очистка выбора ---
     function clearSelection() {
         game.selectedSatellite = null;
         correctBtn.disabled = true;
