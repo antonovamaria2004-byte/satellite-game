@@ -54,8 +54,12 @@
             </div>
             <div class="button-row" style="margin-top: 8px;">
                 <button id="reset-campaign-btn" style="background: #550000; border-color: #ff4444;">Сбросить кампанию</button>
+                <button id="fullscreen-btn" style="background: #003355; border-color: #00ffff;">На весь экран</button>
             </div>
         </section>
+
+        <!-- Подсказка -->
+        <div id="hint-bar">Нажмите «Запуск», чтобы начать миссию</div>
 
         <section id="telemetry">
             <div>Время: <span id="time-value">0.0</span> с</div>
@@ -69,7 +73,10 @@
         <div id="achievements-screen" class="hidden">
             <h2>Достижения</h2>
             <ul id="achievements-list"></ul>
-            <button id="close-achievements-btn">Закрыть</button>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                <button id="close-achievements-btn">Закрыть</button>
+                <button id="reset-all-btn" style="background: #550000; border-color: #ff4444;">Сбросить всё</button>
+            </div>
         </div>
 
         <div id="result-screen" class="hidden">
