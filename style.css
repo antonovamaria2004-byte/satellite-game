@@ -115,28 +115,50 @@ html, body {
     border-top: 1px solid #00ffff;
 }
 
-.sat-types-row {
-    display: flex;
-    gap: 5px;
-    margin-bottom: 10px;
-}
-
-.sat-type {
-    flex: 1;
-    padding: 6px 2px;
+.queue-label {
     font-size: 10px;
-    background: #222;
-    border: 1px solid #555;
     color: #aaa;
-    border-radius: 4px;
-    cursor: pointer;
-    text-transform: uppercase;
+    margin-bottom: 4px;
 }
 
-.sat-type.active {
-    background: #0055aa;
-    border-color: #00ffff;
+.queue-container {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.queue-btn {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #555;
+    background: #222;
     color: #fff;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+/* Цвета типов */
+.queue-btn.standard { border-color: #00ffff; color: #00ffff; }
+.queue-btn.fast { border-color: #ffaa00; color: #ffaa00; }
+.queue-btn.heavy { border-color: #ff4444; color: #ff4444; }
+
+.queue-btn.active {
+    box-shadow: 0 0 10px currentColor;
+    transform: scale(1.1);
+}
+
+.queue-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .sliders-grid {
@@ -193,13 +215,13 @@ html, body {
 
 .button-row {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .main-actions button {
     flex: 1;
-    padding: 14px 4px;
-    font-size: 14px;
+    padding: 12px 2px;
+    font-size: 12px;
     font-weight: bold;
     text-transform: uppercase;
     border-radius: 6px;
@@ -412,7 +434,8 @@ html, body {
 @media (min-width: 768px) {
     .sliders-grid { grid-template-columns: repeat(4, 1fr); }
     #controls { padding: 15px 20px; }
-    .main-actions button { font-size: 16px; padding: 16px; }
+    .main-actions button { font-size: 14px; padding: 14px; }
     #telemetry { font-size: 14px; }
     #hint-bar { font-size: 14px; padding: 8px; }
+    .queue-btn { width: 40px; height: 40px; font-size: 18px; }
 }
