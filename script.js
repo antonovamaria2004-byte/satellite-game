@@ -2,7 +2,7 @@
     'use strict';
 
     // ============================================================
-    // КАМПАНИЯ: список миссий
+    // КАМПАНИЯ
     // ============================================================
     const CAMPAIGN = [
         { count: 2, interval: 5, altitude: 300, title: 'Запустить 2 спутника' },
@@ -12,12 +12,21 @@
         { count: 6, interval: 2, altitude: 550, title: 'Запустить 6 спутников' }
     ];
 
-    // Параметры псевдо-3D
-    const PERSPECTIVE_TILT = 0.45; // насколько сжимаем вертикаль (0 = плоско, 1 = сильно)
-    const SHADOW_OFFSET_X = 3;
-    const SHADOW_OFFSET_Y = 4;
+    // Список достижений
+    const ACHIEVEMENTS = [
+        { id: 'first_launch', name: 'Первый запуск', desc: 'Запустить первую миссию' },
+        { id: 'no_collisions', name: 'Чистое небо', desc: 'Пройти миссию без столкновений' },
+        { id: 'no_corrections', name: 'Экономист', desc: 'Пройти миссию без коррекций' },
+        { id: 'many_satellites', name: 'Плотная группировка', desc: 'Запустить 5+ спутников' },
+        { id: 'campaign_done', name: 'Покоритель орбит', desc: 'Пройти всю кампанию' },
+        { id: 'dodger', name: 'Уклонист', desc: 'Пережить космический мусор' }
+    ];
 
-    // --- Получение элементов DOM ---
+    const PERSPECTIVE_TILT = 0.45;
+    const DV_PER_CORRECTION = 10;
+    const DEBRIS_SPAWN_CHANCE = 0.008; // шанс появления мусора за кадр
+
+    // --- DOM ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const altitudeSlider = document.getElementById('altitude');
@@ -29,9 +38,16 @@
     const intervalSlider = document.getElementById('interval');
     const intervalValue = document.getElementById('interval-value');
     const startBtn = document.getElementById('start-btn');
+    const pauseBtn = document.getElementById('pause-btn');
     const correctBtn = document.getElementById('correct-btn');
     const resetBtn = document.getElementById('reset-btn');
     const resetCampaignBtn = document.getElementById('reset-campaign-btn');
+    const achievementsBtn = document.getElementById('achievements-btn');
+    const closeAchievementsBtn = document.getElementById('close-achievements-btn');
+    const achievementsScreen = document.getElementById('achievements-screen');
+    const achievementsList = document.getElementById('achievements-list');
+    const eventBanner = document.getElementById('event-banner');
+    const eventText = document.getElementById('event-text');
     const missionInfo = document.getElementById('mission-info');
     const timeValue = document.getElementById('time-value');
     const launchedValue = document.getElementById('launched-value');
@@ -45,9 +61,10 @@
     const resultNextBtn = document.getElementById('result-next-btn');
     const resultResetBtn = document.getElementById('result-reset-btn');
 
-    // --- Состояние игры ---
+    // --- Состояние ---
     const game = {
         running: false,
+        paused: false,
         finished: false,
         time: 0,
         flightTimeLimit: 30,
@@ -62,48 +79,90 @@
         selectedSatellite: null,
         stars: [],
         totalDV: 0,
-        currentLevel: 0
+        currentLevel: 0,
+        debris: [],
+        debrisSpawned: false,
+        unlockedAchievements: {},
+        correctionsMade: false
     };
 
-    const DV_PER_CORRECTION = 10;
+    // ============================================================
+    // ДОСТИЖЕНИЯ
+    // ============================================================
+    function loadAchievements() {
+        try {
+            const saved = localStorage.getItem('satellite_achievements');
+            if (saved) {
+                game.unlockedAchievements = JSON.parse(saved);
+            }
+        } catch (e) {
+            game.unlockedAchievements = {};
+        }
+    }
+
+    function saveAchievements() {
+        try {
+            localStorage.setItem('satellite_achievements', JSON.stringify(game.unlockedAchievements));
+        } catch (e) {}
+    }
+
+    function unlockAchievement(id) {
+        if (game.unlockedAchievements[id]) return;
+        game.unlockedAchievements[id] = true;
+        saveAchievements();
+        showBanner('🏆 Достижение: ' + ACHIEVEMENTS.find(a => a.id === id).name);
+    }
+
+    function renderAchievements() {
+        achievementsList.innerHTML = '';
+        for (const ach of ACHIEVEMENTS) {
+            const li = document.createElement('li');
+            const unlocked = game.unlockedAchievements[ach.id];
+            li.className = unlocked ? 'unlocked' : 'locked';
+            li.textContent = (unlocked ? '✅ ' : '🔒 ') + ach.name + ' — ' + ach.desc;
+            achievementsList.appendChild(li);
+        }
+    }
 
     // ============================================================
-    // СОХРАНЕНИЕ ПРОГРЕССА
+    // БАННЕР СОБЫТИЙ
+    // ============================================================
+    let bannerTimer = null;
+    function showBanner(text) {
+        eventText.textContent = text;
+        eventBanner.classList.remove('hidden');
+        if (bannerTimer) clearTimeout(bannerTimer);
+        bannerTimer = setTimeout(() => {
+            eventBanner.classList.add('hidden');
+        }, 2500);
+    }
+
+    // ============================================================
+    // ПРОГРЕСС КАМПАНИИ
     // ============================================================
     function loadProgress() {
         try {
             const saved = localStorage.getItem('satellite_campaign_level');
             if (saved !== null) {
                 const level = parseInt(saved, 10);
-                if (level >= 0 && level < CAMPAIGN.length) {
-                    game.currentLevel = level;
-                }
+                if (level >= 0 && level < CAMPAIGN.length) game.currentLevel = level;
             }
-        } catch (e) {
-            game.currentLevel = 0;
-        }
+        } catch (e) { game.currentLevel = 0; }
     }
 
     function saveProgress() {
-        try {
-            localStorage.setItem('satellite_campaign_level', game.currentLevel);
-        } catch (e) {
-        }
+        try { localStorage.setItem('satellite_campaign_level', game.currentLevel); }
+        catch (e) {}
     }
 
-    // ============================================================
-    // ПРИМЕНЕНИЕ УРОВНЯ
-    // ============================================================
     function applyLevel() {
         const level = CAMPAIGN[game.currentLevel];
         if (!level) return;
 
         altitudeSlider.value = level.altitude;
         altitudeValue.textContent = level.altitude;
-
         countSlider.value = level.count;
         countValue.textContent = level.count;
-
         intervalSlider.value = level.interval;
         intervalValue.textContent = level.interval;
 
@@ -112,9 +171,7 @@
         game.launchInterval = level.interval;
 
         missionInfo.textContent =
-            'Миссия ' + (game.currentLevel + 1) + ' / ' + CAMPAIGN.length +
-            ' — ' + level.title;
-
+            'Миссия ' + (game.currentLevel + 1) + ' / ' + CAMPAIGN.length + ' — ' + level.title;
         launchedValue.textContent = '0 / ' + level.count;
     }
 
@@ -122,12 +179,10 @@
     // ЗВЁЗДЫ
     // ============================================================
     function createStars() {
-        const count = 150;
         game.stars = [];
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < 150; i++) {
             game.stars.push({
-                x: Math.random(),
-                y: Math.random(),
+                x: Math.random(), y: Math.random(),
                 radius: Math.random() * 1.5 + 0.3,
                 phase: Math.random() * Math.PI * 2,
                 speed: Math.random() * 2 + 1
@@ -135,7 +190,6 @@
         }
     }
 
-    // --- Размеры canvas ---
     function resizeCanvas() {
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width;
@@ -145,37 +199,14 @@
     window.addEventListener('resize', resizeCanvas);
 
     // ============================================================
-    // ПСЕВДО-3D: преобразование координат
+    // СПУТНИКИ
     // ============================================================
-    // Превращаем обычные (x, y) на плоскости в «наклонённые» (screenX, screenY)
-    function toScreen(x, y, cx, cy) {
-        return {
-            sx: cx + x,
-            sy: cy + y * PERSPECTIVE_TILT
-        };
-    }
-
-    // Отрисовка эллипса (орбиты) с наклоном
-    function drawTiltedCircle(cx, cy, radius, strokeStyle, lineWidth, dashed) {
-        ctx.beginPath();
-        if (dashed) ctx.setLineDash([5, 5]);
-        // ctx.ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle)
-        ctx.ellipse(cx, cy, radius, radius * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = lineWidth;
-        ctx.stroke();
-        if (dashed) ctx.setLineDash([]);
-    }
-
-    // --- Создание спутника ---
     function createSatellite(index) {
         const impulseFactor = game.impulse / 100;
         const startRadius = 40 + impulseFactor * 60;
         const startAngle = (Math.PI * 2 / game.totalSatellites) * index;
-
         const heightStep = game.totalSatellites > 4 ? 20 : 30;
         const altitudeOffset = index * heightStep;
-
         return {
             id: index + 1,
             angle: startAngle,
@@ -186,14 +217,46 @@
             speedMultiplier: 1.0,
             fuel: 100,
             spentDV: 0,
-            highlighted: false,
             trail: []
         };
     }
 
-    // --- Логика ---
+    // ============================================================
+    // КОСМИЧЕСКИЙ МУСОР
+    // ============================================================
+    function spawnDebris() {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 150 + Math.random() * 200;
+        game.debris.push({
+            angle: angle,
+            radius: radius,
+            speed: 0.4 + Math.random() * 0.6,
+            life: 15 // живёт 15 секунд
+        });
+        game.debrisSpawned = true;
+        showBanner('⚠ Внимание! Космический мусор!');
+    }
+
+    function updateDebris(dt) {
+        // Удаляем старый мусор
+        for (let i = game.debris.length - 1; i >= 0; i--) {
+            const d = game.debris[i];
+            d.life -= dt;
+            d.angle += d.speed * dt;
+            if (d.angle > Math.PI * 2) d.angle -= Math.PI * 2;
+            if (d.life <= 0) {
+                game.debris.splice(i, 1);
+                // Игрок пережил мусор — даём ачивку
+                unlockAchievement('dodger');
+            }
+        }
+    }
+
+    // ============================================================
+    // ЛОГИКА
+    // ============================================================
     function update(dt) {
-        if (!game.running || game.finished) return;
+        if (!game.running || game.finished || game.paused) return;
 
         game.time += dt;
 
@@ -203,7 +266,14 @@
             game.satellites.push(newSat);
             game.lastLaunchTime = game.time;
             launchedValue.textContent = game.satellites.length + ' / ' + game.totalSatellites;
+            if (game.satellites.length === 1) unlockAchievement('first_launch');
         }
+
+        // Шанс появления мусора
+        if (!game.debrisSpawned && Math.random() < DEBRIS_SPAWN_CHANCE) {
+            spawnDebris();
+        }
+        updateDebris(dt);
 
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
@@ -215,9 +285,7 @@
             sat.radius += diff * 0.5 * dt;
 
             sat.trail.push({ angle: sat.angle, radius: sat.radius });
-            if (sat.trail.length > 40) {
-                sat.trail.shift();
-            }
+            if (sat.trail.length > 40) sat.trail.shift();
         }
 
         checkCollisions();
@@ -231,7 +299,6 @@
         }
     }
 
-    // --- Информация о выбранном спутнике ---
     function updateSelectedInfo() {
         if (!game.selectedSatellite) {
             selectedInfo.classList.add('hidden');
@@ -253,17 +320,14 @@
         selectedInfo.classList.remove('hidden');
     }
 
-    // --- Столкновения ---
     function checkCollisions() {
         for (let i = 0; i < game.satellites.length; i++) {
             for (let j = i + 1; j < game.satellites.length; j++) {
                 const s1 = game.satellites[i];
                 const s2 = game.satellites[j];
-
                 if (Math.abs(s1.radius - s2.radius) < 15) {
                     let angleDiff = Math.abs(s1.angle - s2.angle);
                     if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-
                     if (angleDiff < 0.15) {
                         game.collisions++;
                         collisionValue.textContent = game.collisions;
@@ -279,72 +343,43 @@
     // ОТРИСОВКА (псевдо-3D)
     // ============================================================
     function render() {
-        const w = canvas.width;
-        const h = canvas.height;
-        const cx = w / 2;
-        const cy = h / 2;
+        const w = canvas.width, h = canvas.height;
+        const cx = w / 2, cy = h / 2;
 
         ctx.clearRect(0, 0, w, h);
 
-        // --- Звёздный фон ---
-        const timeSec = performance.now() / 1000;
+        // Звёзды
+        const tSec = performance.now() / 1000;
         for (let i = 0; i < game.stars.length; i++) {
-            const star = game.stars[i];
-            const sx = star.x * w;
-            const sy = star.y * h;
-            const twinkle = 0.5 + 0.5 * Math.sin(timeSec * star.speed + star.phase);
-            ctx.globalAlpha = 0.3 + twinkle * 0.7;
+            const st = game.stars[i];
+            const tw = 0.5 + 0.5 * Math.sin(tSec * st.speed + st.phase);
+            ctx.globalAlpha = 0.3 + tw * 0.7;
             ctx.beginPath();
-            ctx.arc(sx, sy, star.radius, 0, Math.PI * 2);
+            ctx.arc(st.x * w, st.y * h, st.radius, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
         }
         ctx.globalAlpha = 1.0;
 
-        // --- Тень Земли (под шаром) ---
-        ctx.beginPath();
-        ctx.ellipse(
-            cx + SHADOW_OFFSET_X,
-            cy + game.earthRadius * PERSPECTIVE_TILT + SHADOW_OFFSET_Y,
-            game.earthRadius * 0.95,
-            game.earthRadius * PERSPECTIVE_TILT * 0.6,
-            0, 0, Math.PI * 2
-        );
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fill();
-
-        // --- Земля: объёмный шар ---
-        // Основной градиент (от светлого к тёмному — имитация сферы)
+        // Земля
         const earthGrad = ctx.createRadialGradient(
-            cx - game.earthRadius * 0.4,
-            cy - game.earthRadius * 0.4,
-            game.earthRadius * 0.1,
-            cx,
-            cy,
-            game.earthRadius
+            cx - game.earthRadius * 0.4, cy - game.earthRadius * 0.4, game.earthRadius * 0.1,
+            cx, cy, game.earthRadius
         );
-        earthGrad.addColorStop(0, '#4db8ff');   // блик
-        earthGrad.addColorStop(0.4, '#1a6fb0'); // светлая часть
-        earthGrad.addColorStop(1, '#06243d');   // тёмная сторона
-
+        earthGrad.addColorStop(0, '#4db8ff');
+        earthGrad.addColorStop(0.4, '#1a6fb0');
+        earthGrad.addColorStop(1, '#06243d');
         ctx.beginPath();
         ctx.arc(cx, cy, game.earthRadius, 0, Math.PI * 2);
         ctx.fillStyle = earthGrad;
         ctx.fill();
-
-        // Контур
         ctx.strokeStyle = '#00ffff';
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Блик (маленькое светлое пятно в верхнем левом углу)
         const highlightGrad = ctx.createRadialGradient(
-            cx - game.earthRadius * 0.45,
-            cy - game.earthRadius * 0.45,
-            0,
-            cx - game.earthRadius * 0.45,
-            cy - game.earthRadius * 0.45,
-            game.earthRadius * 0.4
+            cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, 0,
+            cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, game.earthRadius * 0.4
         );
         highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
         highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
@@ -353,7 +388,6 @@
         ctx.fillStyle = highlightGrad;
         ctx.fill();
 
-        // Атмосферный ореол
         const haloGrad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 40);
         haloGrad.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
         haloGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
@@ -362,48 +396,41 @@
         ctx.fillStyle = haloGrad;
         ctx.fill();
 
-        // --- Целевые орбиты (эллипсы) ---
+        // Целевые орбиты
         if (game.running && game.satellites.length > 0) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const targetR = game.satellites[i].targetRadius;
-                drawTiltedCircle(cx, cy, targetR, 'rgba(0, 255, 255, 0.25)', 1, true);
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.ellipse(cx, cy, targetR, targetR * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
             }
         }
 
-        // --- Угловое расстояние (по эллипсу) ---
+        // Дуги углов
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
                 const s2 = game.satellites[(i + 1) % game.satellites.length];
-
                 let angleDiff = Math.abs(s1.angle - s2.angle);
                 if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-
                 const diffDeg = angleDiff * 180 / Math.PI;
-
                 let arcColor = '#00ff00';
-                if (diffDeg < 10) {
-                    arcColor = '#ff4444';
-                } else if (diffDeg < 30) {
-                    arcColor = '#ffaa00';
-                }
+                if (diffDeg < 10) arcColor = '#ff4444';
+                else if (diffDeg < 30) arcColor = '#ffaa00';
 
                 const arcRadius = (s1.radius + s2.radius) / 2;
-
-                // Рисуем дугу как эллипс
                 ctx.beginPath();
                 ctx.ellipse(cx, cy, arcRadius, arcRadius * PERSPECTIVE_TILT, 0, s1.angle, s2.angle);
                 ctx.strokeStyle = arcColor;
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Подпись
                 let midAngle = (s1.angle + s2.angle) / 2;
-                if (Math.abs(s1.angle - s2.angle) > Math.PI) {
-                    midAngle = (s1.angle + s2.angle) / 2 + Math.PI;
-                }
-
-                // Позиция подписи на эллипсе
+                if (Math.abs(s1.angle - s2.angle) > Math.PI) midAngle = (s1.angle + s2.angle) / 2 + Math.PI;
                 const tx = cx + Math.cos(midAngle) * arcRadius;
                 const ty = cy + Math.sin(midAngle) * arcRadius * PERSPECTIVE_TILT;
 
@@ -412,22 +439,20 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(diffDeg.toFixed(0) + '°', tx, ty);
-
                 ctx.textAlign = 'start';
                 ctx.textBaseline = 'alphabetic';
             }
         }
 
-        // --- Следы (сужающиеся к дальнему краю) ---
+        // Следы
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             for (let t = 0; t < sat.trail.length; t++) {
-                const point = sat.trail[t];
-                const px = cx + Math.cos(point.angle) * point.radius;
-                const py = cy + Math.sin(point.angle) * point.radius * PERSPECTIVE_TILT;
+                const p = sat.trail[t];
+                const px = cx + Math.cos(p.angle) * p.radius;
+                const py = cy + Math.sin(p.angle) * p.radius * PERSPECTIVE_TILT;
                 const alpha = (t / sat.trail.length) * 0.5;
-                const size = (1 + (t / sat.trail.length) * 3) * (1 + Math.sin(point.angle) * 0.3);
-
+                const size = (1 + (t / sat.trail.length) * 3) * (1 + Math.sin(p.angle) * 0.3);
                 ctx.beginPath();
                 ctx.arc(px, py, Math.max(0.5, size), 0, Math.PI * 2);
                 ctx.fillStyle = sat === game.selectedSatellite
@@ -437,47 +462,54 @@
             }
         }
 
-        // --- Спутники с тенями и объёмом ---
+        // Космический мусор
+        for (let i = 0; i < game.debris.length; i++) {
+            const d = game.debris[i];
+            const x = cx + Math.cos(d.angle) * d.radius;
+            const y = cy + Math.sin(d.angle) * d.radius * PERSPECTIVE_TILT;
+            // Вращающийся крестик
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(d.angle * 3);
+            ctx.fillStyle = '#ff4444';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff0000';
+            ctx.fillRect(-6, -2, 12, 4);
+            ctx.fillRect(-2, -6, 4, 12);
+            ctx.restore();
+            ctx.shadowBlur = 0;
+        }
+
+        // Спутники
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
-
-            // Позиция спутника на эллипсе
             const x = cx + Math.cos(sat.angle) * sat.radius;
             const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
 
-            // Тень (овал под спутником)
+            // Тень
             ctx.beginPath();
             ctx.ellipse(x + 2, y + 4, 7, 4, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
             ctx.fill();
 
-            // Цвет спутника
             let satColor = '#00ffff';
             if (sat.fuel <= 20) satColor = '#ffaa00';
             if (sat.fuel <= 0) satColor = '#ff4444';
             if (sat === game.selectedSatellite) satColor = '#ffffff';
 
-            // Тень свечения
-            ctx.shadowBlur = sat === game.selectedSatellite ? 25 : 15;
-            ctx.shadowColor = satColor;
-
-            // Основной круг спутника (объём через радиальный градиент)
-            const satGrad = ctx.createRadialGradient(
-                x - 3, y - 3, 1,
-                x, y, 8
-            );
+            const satGrad = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, 8);
             satGrad.addColorStop(0, '#ffffff');
             satGrad.addColorStop(0.5, satColor);
             satGrad.addColorStop(1, satColor);
 
+            ctx.shadowBlur = sat === game.selectedSatellite ? 25 : 15;
+            ctx.shadowColor = satColor;
             ctx.beginPath();
             ctx.arc(x, y, 8, 0, Math.PI * 2);
             ctx.fillStyle = satGrad;
             ctx.fill();
-
             ctx.shadowBlur = 0;
 
-            // Кольцо вокруг выбранного
             if (sat === game.selectedSatellite) {
                 ctx.beginPath();
                 ctx.arc(x, y, 12, 0, Math.PI * 2);
@@ -486,26 +518,27 @@
                 ctx.stroke();
             }
 
-            // Подпись
             ctx.fillStyle = '#ffffff';
             ctx.font = '10px Courier New';
             ctx.fillText('SAT-' + sat.id, x + 10, y + 4);
         }
     }
 
-    // --- Игровой цикл ---
+    // ============================================================
+    // ИГРОВОЙ ЦИКЛ
+    // ============================================================
     let lastTime = performance.now();
     function loop(now) {
         const dt = Math.min((now - lastTime) / 1000, 0.1);
         lastTime = now;
-
         update(dt);
         render();
-
         requestAnimationFrame(loop);
     }
 
-    // --- Клик по canvas (с учётом эллипса) ---
+    // ============================================================
+    // КЛИК
+    // ============================================================
     function handleCanvasClick(event) {
         if (!game.running || game.finished) return;
 
@@ -521,10 +554,7 @@
             const x = cx + Math.cos(sat.angle) * sat.radius;
             const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
             const dist = Math.sqrt((clickX - x) ** 2 + (clickY - y) ** 2);
-            if (dist < 20) {
-                found = sat;
-                break;
-            }
+            if (dist < 20) { found = sat; break; }
         }
 
         if (found) {
@@ -537,7 +567,6 @@
         } else {
             clearSelection();
         }
-
         updateSelectedInfo();
     }
 
@@ -547,25 +576,27 @@
         selectedInfo.classList.add('hidden');
     }
 
-    // --- Коррекция ---
+    // ============================================================
+    // КОРРЕКЦИЯ
+    // ============================================================
     function correctSelected() {
         if (!game.selectedSatellite) return;
         const sat = game.selectedSatellite;
-
         if (sat.fuel < DV_PER_CORRECTION) {
             selectedValue.textContent = 'SAT-' + sat.id + ' | ТОПЛИВО ИСЧЕРПАНО!';
             return;
         }
-
         sat.fuel -= DV_PER_CORRECTION;
         sat.spentDV += DV_PER_CORRECTION;
         game.totalDV += DV_PER_CORRECTION;
+        game.correctionsMade = true;
         sat.speedMultiplier = Math.min(2.0, sat.speedMultiplier + 0.1);
-
         updateSelectedInfo();
     }
 
-    // --- Завершение игры ---
+    // ============================================================
+    // ЗАВЕРШЕНИЕ
+    // ============================================================
     function finishGame() {
         game.running = false;
         game.finished = true;
@@ -575,29 +606,24 @@
         let altitudeBonus = 0;
         if (game.satellites.length === game.totalSatellites) {
             const altitudes = game.satellites.map(s => Math.round(s.radius));
-            const uniqueAltitudes = new Set(altitudes).size;
-            if (uniqueAltitudes === game.totalSatellites) {
-                altitudeBonus = 50;
-            }
+            if (new Set(altitudes).size === game.totalSatellites) altitudeBonus = 50;
         }
-
         const fuelBonus = Math.max(0, 100 - game.totalDV);
-
-        const score = (game.satellites.length * 100)
-                    - (game.collisions * 200)
-                    + altitudeBonus
-                    + fuelBonus;
+        const score = (game.satellites.length * 100) - (game.collisions * 200) + altitudeBonus + fuelBonus;
 
         let message = '';
-        if (success && altitudeBonus > 0) {
-            message = 'Все спутники выведены на разные орбиты без столкновений!';
-        } else if (success) {
-            message = 'Все спутники успешно выведены на орбиту без столкновений!';
-        } else if (game.collisions > 0) {
-            message = 'Зафиксировано столкновений: ' + game.collisions + '.';
-        } else {
-            message = 'Не все спутники выведены.';
-        }
+        if (success && altitudeBonus > 0) message = 'Все спутники на разных орбитах без столкновений!';
+        else if (success) message = 'Все спутники успешно выведены без столкновений!';
+        else if (game.collisions > 0) message = 'Столкновений: ' + game.collisions;
+        else message = 'Не все спутники выведены.';
+
+        // Достижения
+        if (success && game.collisions === 0) unlockAchievement('no_collisions');
+        if (success && !game.correctionsMade) unlockAchievement('no_corrections');
+        if (game.satellites.length >= 5) unlockAchievement('many_satellites');
+
+        const hasNext = game.currentLevel < CAMPAIGN.length - 1;
+        if (success && !hasNext) unlockAchievement('campaign_done');
 
         resultTitle.textContent = success ? 'УСПЕХ' : 'НЕУДАЧА';
         resultTitle.style.color = success ? '#00ff00' : '#ff4444';
@@ -611,7 +637,6 @@
             'Бонус за высоты: ' + altitudeBonus + '<br>' +
             'Бонус за экономию: ' + fuelBonus;
 
-        const hasNext = game.currentLevel < CAMPAIGN.length - 1;
         if (success && hasNext) {
             resultNextBtn.classList.remove('hidden');
         } else {
@@ -625,14 +650,18 @@
 
         resultScreen.classList.remove('hidden');
         startBtn.disabled = true;
+        pauseBtn.disabled = true;
         clearSelection();
     }
 
-    // --- Старт миссии ---
+    // ============================================================
+    // СТАРТ / СБРОС
+    // ============================================================
     function startGame() {
         if (game.running) return;
 
         game.running = true;
+        game.paused = false;
         game.finished = false;
         game.time = 0;
         game.lastLaunchTime = 0;
@@ -643,6 +672,9 @@
         game.satellites = [];
         game.collisions = 0;
         game.totalDV = 0;
+        game.debris = [];
+        game.debrisSpawned = false;
+        game.correctionsMade = false;
 
         resultScreen.classList.add('hidden');
         collisionValue.textContent = '0';
@@ -650,20 +682,31 @@
         dvValue.textContent = '0';
         launchedValue.textContent = '0 / ' + game.totalSatellites;
         startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Пауза';
         clearSelection();
 
         lastTime = performance.now();
     }
 
-    // --- Сброс миссии ---
+    function togglePause() {
+        if (!game.running || game.finished) return;
+        game.paused = !game.paused;
+        pauseBtn.textContent = game.paused ? 'Продолжить' : 'Пауза';
+    }
+
     function resetGame() {
         game.running = false;
+        game.paused = false;
         game.finished = false;
         game.time = 0;
         game.lastLaunchTime = 0;
         game.satellites = [];
         game.collisions = 0;
         game.totalDV = 0;
+        game.debris = [];
+        game.debrisSpawned = false;
+        game.correctionsMade = false;
 
         resultScreen.classList.add('hidden');
         timeValue.textContent = '0.0';
@@ -672,19 +715,18 @@
         collisionValue.style.color = '#00ffff';
         dvValue.textContent = '0';
         startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        pauseBtn.textContent = 'Пауза';
         clearSelection();
-
         render();
     }
 
-    // --- Следующая миссия ---
     function nextMission() {
         resultScreen.classList.add('hidden');
         applyLevel();
         resetGame();
     }
 
-    // --- Сброс кампании ---
     function resetCampaign() {
         if (!confirm('Начать кампанию с первого уровня?')) return;
         game.currentLevel = 0;
@@ -693,32 +735,38 @@
         resetGame();
     }
 
-    // --- Обработчики ---
+    // ============================================================
+    // ОБРАБОТЧИКИ
+    // ============================================================
     altitudeSlider.addEventListener('input', function () {
         altitudeValue.textContent = this.value;
     });
-
     impulseSlider.addEventListener('input', function () {
         impulseValue.textContent = this.value;
     });
-
     countSlider.addEventListener('input', function () {
         countValue.textContent = this.value;
         launchedValue.textContent = '0 / ' + this.value;
     });
-
     intervalSlider.addEventListener('input', function () {
         intervalValue.textContent = this.value;
     });
 
     startBtn.addEventListener('click', startGame);
+    pauseBtn.addEventListener('click', togglePause);
     correctBtn.addEventListener('click', correctSelected);
     resetBtn.addEventListener('click', resetGame);
     resetCampaignBtn.addEventListener('click', resetCampaign);
     resultResetBtn.addEventListener('click', resetGame);
     resultNextBtn.addEventListener('click', nextMission);
+    achievementsBtn.addEventListener('click', function () {
+        renderAchievements();
+        achievementsScreen.classList.remove('hidden');
+    });
+    closeAchievementsBtn.addEventListener('click', function () {
+        achievementsScreen.classList.add('hidden');
+    });
 
-    // --- Клик и тап ---
     canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('touchstart', function (e) {
         if (e.touches.length === 1) {
@@ -727,7 +775,6 @@
         }
     }, { passive: true });
 
-    // --- Клавиатура ---
     document.addEventListener('keydown', function (e) {
         if (e.key === 'ArrowUp') {
             altitudeSlider.value = Math.min(800, parseInt(altitudeSlider.value, 10) + 10);
@@ -745,8 +792,9 @@
             impulseSlider.value = Math.max(10, parseInt(impulseSlider.value, 10) - 5);
             impulseValue.textContent = impulseSlider.value;
             e.preventDefault();
-        } else if (e.key === ' ' || e.key === 'Enter') {
+        } else if (e.key === ' ') {
             if (!game.running) startGame();
+            else togglePause();
             e.preventDefault();
         } else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
             resetGame();
@@ -757,9 +805,12 @@
         }
     });
 
-    // --- Инициализация ---
+    // ============================================================
+    // СТАРТ
+    // ============================================================
     createStars();
     loadProgress();
+    loadAchievements();
     applyLevel();
     resizeCanvas();
     requestAnimationFrame(loop);
