@@ -19,13 +19,20 @@ html, body {
     flex-direction: column;
     height: 100%;
     width: 100%;
+    position: relative;
 }
 
+/* Шапка */
 #top-bar {
-    padding: 8px;
-    text-align: center;
+    padding: 8px 12px;
     background: #001133;
     border-bottom: 1px solid #00ffff;
+}
+
+.top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 #top-bar h1 {
@@ -35,13 +42,59 @@ html, body {
     letter-spacing: 1px;
 }
 
+.icon-btn {
+    background: none;
+    border: 1px solid #00ffff;
+    color: #00ffff;
+    font-size: 20px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
 #mission-info {
     font-size: 12px;
     color: #aaa;
     margin-top: 4px;
-    letter-spacing: 1px;
 }
 
+/* Боковое меню */
+#side-menu {
+    position: absolute;
+    top: 50px;
+    right: 10px;
+    background: rgba(0, 20, 40, 0.95);
+    border: 1px solid #00ffff;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 300;
+    min-width: 180px;
+}
+
+#side-menu.hidden {
+    display: none;
+}
+
+#side-menu button {
+    padding: 10px;
+    background: #003355;
+    border: 1px solid #00ffff;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+
+#side-menu button.danger {
+    background: #550000;
+    border-color: #ff4444;
+}
+
+/* Игровая зона */
 #game-area {
     flex: 1;
     position: relative;
@@ -55,59 +108,87 @@ html, body {
     touch-action: manipulation;
 }
 
+/* Панель управления */
 #controls {
-    padding: 10px;
-    background: rgba(0, 20, 40, 0.9);
+    padding: 8px 12px;
+    background: rgba(0, 20, 40, 0.95);
     border-top: 1px solid #00ffff;
 }
 
-.control-group {
+.sat-types-row {
+    display: flex;
+    gap: 5px;
     margin-bottom: 10px;
+}
+
+.sat-type {
+    flex: 1;
+    padding: 6px 2px;
+    font-size: 10px;
+    background: #222;
+    border: 1px solid #555;
+    color: #aaa;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.sat-type.active {
+    background: #0055aa;
+    border-color: #00ffff;
+    color: #fff;
+}
+
+.sliders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    margin-bottom: 12px;
 }
 
 .control-group label {
     display: block;
-    font-size: 13px;
-    margin-bottom: 5px;
+    font-size: 11px;
+    margin-bottom: 2px;
     color: #aaa;
 }
 
 .control-group input[type="range"] {
     width: 100%;
-    height: 30px;
+    height: 24px;
     background: transparent;
     cursor: pointer;
 }
 
 .control-group input[type="range"]::-webkit-slider-runnable-track {
-    height: 8px;
+    height: 6px;
     background: #003366;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 .control-group input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     background: #00ffff;
     border-radius: 50%;
-    margin-top: -8px;
-    box-shadow: 0 0 10px #00ffff;
+    margin-top: -7px;
+    box-shadow: 0 0 8px #00ffff;
 }
 
 .control-group input[type="range"]::-moz-range-track {
-    height: 8px;
+    height: 6px;
     background: #003366;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 .control-group input[type="range"]::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     background: #00ffff;
     border: none;
     border-radius: 50%;
-    box-shadow: 0 0 10px #00ffff;
+    box-shadow: 0 0 8px #00ffff;
 }
 
 .button-row {
@@ -115,51 +196,59 @@ html, body {
     gap: 8px;
 }
 
-.button-row button {
+.main-actions button {
     flex: 1;
-    padding: 14px 6px;
-    font-size: 13px;
+    padding: 14px 4px;
+    font-size: 14px;
     font-weight: bold;
     text-transform: uppercase;
-    color: #ffffff;
-    background: #0055aa;
-    border: 1px solid #00ffff;
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: background 0.2s;
+    border: 1px solid #00ffff;
+    background: #0055aa;
+    color: #fff;
+    transition: background 0.1s;
 }
 
-.button-row button:hover {
-    background: #0077cc;
-}
-
-.button-row button:active {
+.main-actions button:active {
     background: #00ffff;
-    color: #001133;
+    color: #000;
 }
 
-.button-row button:disabled {
-    background: #333;
-    border-color: #555;
-    color: #777;
-    cursor: not-allowed;
+.main-actions .primary {
+    background: #0077cc;
 }
 
 #pause-btn {
     background: #555500;
     border-color: #ffff00;
 }
-#pause-btn:hover {
-    background: #777700;
+
+.main-actions button:disabled {
+    background: #222;
+    border-color: #444;
+    color: #666;
+    cursor: not-allowed;
 }
 
+/* Подсказка */
+#hint-bar {
+    text-align: center;
+    font-size: 11px;
+    color: #ffaa00;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    border-top: 1px solid #003366;
+}
+
+/* Телеметрия */
 #telemetry {
     display: flex;
     justify-content: space-around;
     flex-wrap: wrap;
-    gap: 5px;
-    padding: 8px;
-    font-size: 12px;
+    gap: 4px;
+    padding: 6px;
+    font-size: 11px;
     background: #001133;
     border-top: 1px solid #003366;
     text-align: center;
@@ -167,7 +256,7 @@ html, body {
 
 #telemetry > div {
     flex: 1 1 auto;
-    min-width: 90px;
+    min-width: 80px;
 }
 
 #telemetry span {
@@ -190,50 +279,23 @@ html, body {
     display: none !important;
 }
 
-/* Подсказка */
-#hint-bar {
-    text-align: center;
-    font-size: 12px;
-    color: #ffaa00;
-    padding: 6px;
-    background: rgba(0, 0, 0, 0.6);
-    border-top: 1px solid #003366;
-    min-height: 28px;
-}
-
-/* Подсветка кнопки, на которую нужно нажать */
-@keyframes glow-btn {
-    0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
-    50% { box-shadow: 0 0 10px 5px rgba(0, 255, 255, 0.7); }
-    100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
-}
-
-.glow {
-    animation: glow-btn 1.5s infinite;
-}
-
-/* Всплывающий баннер событий */
+/* Баннер событий */
 #event-banner {
     position: absolute;
-    top: 20%;
+    top: 10%;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(255, 68, 68, 0.95);
-    color: #ffffff;
-    font-size: 16px;
+    color: #fff;
+    font-size: 14px;
     font-weight: bold;
-    padding: 12px 24px;
-    border-radius: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
     border: 2px solid #ff0000;
     text-transform: uppercase;
-    letter-spacing: 1px;
     z-index: 150;
     animation: pulse 0.8s infinite alternate;
     pointer-events: none;
-}
-
-#event-banner.hidden {
-    display: none;
 }
 
 @keyframes pulse {
@@ -247,55 +309,43 @@ html, body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 80%;
+    width: 90%;
     max-width: 400px;
     background: rgba(0, 20, 40, 0.98);
     border: 2px solid #ffaa00;
     border-radius: 10px;
     padding: 20px;
-    z-index: 200;
+    z-index: 400;
     text-align: center;
-}
-
-#achievements-screen.hidden {
-    display: none;
 }
 
 #achievements-screen h2 {
     color: #ffaa00;
     margin-bottom: 15px;
-    font-size: 20px;
 }
 
 #achievements-screen ul {
     list-style: none;
     margin-bottom: 20px;
     text-align: left;
-    max-height: 300px;
+    max-height: 250px;
     overflow-y: auto;
 }
 
 #achievements-screen li {
     padding: 8px;
     border-bottom: 1px solid #003366;
-    font-size: 14px;
+    font-size: 13px;
 }
 
-#achievements-screen li.locked {
-    color: #555;
-}
-
-#achievements-screen li.unlocked {
-    color: #00ff00;
-}
+#achievements-screen li.locked { color: #555; }
+#achievements-screen li.unlocked { color: #00ff00; }
 
 #achievements-screen button {
-    padding: 12px 24px;
-    font-size: 14px;
-    font-weight: bold;
+    padding: 10px 20px;
     background: #0055aa;
     border: 1px solid #00ffff;
-    color: #ffffff;
+    color: #fff;
     border-radius: 5px;
     cursor: pointer;
 }
@@ -303,10 +353,8 @@ html, body {
 /* Экран результата */
 #result-screen {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.9);
     display: flex;
     flex-direction: column;
@@ -314,64 +362,36 @@ html, body {
     align-items: center;
     padding: 20px;
     text-align: center;
-    z-index: 100;
-}
-
-#result-screen.hidden {
-    display: none;
+    z-index: 500;
 }
 
 #result-screen h2 {
     color: #00ffff;
     margin-bottom: 15px;
-    font-size: 22px;
 }
 
 #result-screen p {
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 14px;
+    line-height: 1.5;
     margin-bottom: 20px;
-    color: #ddd;
 }
 
 #result-screen button {
-    padding: 14px 30px;
-    font-size: 16px;
+    padding: 12px 24px;
+    font-size: 14px;
     font-weight: bold;
-    text-transform: uppercase;
-    color: #ffffff;
     background: #0055aa;
     border: 1px solid #00ffff;
+    color: #fff;
     border-radius: 5px;
     cursor: pointer;
-}
-
-#result-screen button:active {
-    background: #00ffff;
-    color: #001133;
 }
 
 #result-next-btn {
-    padding: 14px 24px;
-    font-size: 15px;
-    font-weight: bold;
-    text-transform: uppercase;
-    color: #001133;
     background: #00ff00;
-    border: 1px solid #00ffff;
-    border-radius: 5px;
-    cursor: pointer;
+    color: #000;
 }
 
-#result-next-btn.hidden {
-    display: none;
-}
-
-#result-next-btn:active {
-    background: #00ffff;
-}
-
-/* Рекорд на экране результата */
 .record-text {
     color: #ffaa00;
     font-size: 14px;
@@ -379,10 +399,20 @@ html, body {
     font-weight: bold;
 }
 
-@media (max-width: 600px) {
-    #top-bar h1 { font-size: 14px; }
-    #mission-info { font-size: 11px; }
-    .control-group label { font-size: 12px; }
-    .button-row button { padding: 16px 4px; font-size: 12px; }
-    #telemetry { font-size: 12px; }
+/* Подсветка кнопок */
+@keyframes glow-btn {
+    0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
+    50% { box-shadow: 0 0 10px 5px rgba(0, 255, 255, 0.7); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
+}
+
+.glow { animation: glow-btn 1.5s infinite; }
+
+/* Адаптив для планшетов и десктопа */
+@media (min-width: 768px) {
+    .sliders-grid { grid-template-columns: repeat(4, 1fr); }
+    #controls { padding: 15px 20px; }
+    .main-actions button { font-size: 16px; padding: 16px; }
+    #telemetry { font-size: 14px; }
+    #hint-bar { font-size: 14px; padding: 8px; }
 }
