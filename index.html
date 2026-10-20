@@ -15,6 +15,11 @@
 
         <main id="game-area">
             <canvas id="canvas"></canvas>
+            
+            <!-- Всплывающее сообщение о событии -->
+            <div id="event-banner" class="hidden">
+                <span id="event-text">Событие</span>
+            </div>
         </main>
 
         <section id="controls">
@@ -40,10 +45,13 @@
 
             <div class="button-row">
                 <button id="start-btn">Запуск</button>
+                <button id="pause-btn" disabled>Пауза</button>
                 <button id="correct-btn" disabled>Коррекция</button>
-                <button id="reset-btn">Заново</button>
             </div>
-
+            <div class="button-row" style="margin-top: 8px;">
+                <button id="reset-btn">Заново</button>
+                <button id="achievements-btn" style="background:#553300; border-color:#ffaa00;">Достижения</button>
+            </div>
             <div class="button-row" style="margin-top: 8px;">
                 <button id="reset-campaign-btn" style="background: #550000; border-color: #ff4444;">Сбросить кампанию</button>
             </div>
@@ -56,6 +64,13 @@
             <div>ΔV: <span id="dv-value">0</span></div>
             <div id="selected-info" class="hidden">Выбран: <span id="selected-value">—</span></div>
         </section>
+
+        <!-- Панель достижений -->
+        <div id="achievements-screen" class="hidden">
+            <h2>Достижения</h2>
+            <ul id="achievements-list"></ul>
+            <button id="close-achievements-btn">Закрыть</button>
+        </div>
 
         <div id="result-screen" class="hidden">
             <h2 id="result-title">Результат</h2>
