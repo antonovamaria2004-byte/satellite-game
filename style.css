@@ -145,6 +145,14 @@ html, body {
     cursor: not-allowed;
 }
 
+#pause-btn {
+    background: #555500;
+    border-color: #ffff00;
+}
+#pause-btn:hover {
+    background: #777700;
+}
+
 #telemetry {
     display: flex;
     justify-content: space-around;
@@ -182,6 +190,95 @@ html, body {
     display: none !important;
 }
 
+/* Всплывающий баннер событий */
+#event-banner {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 68, 68, 0.95);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 2px solid #ff0000;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    z-index: 150;
+    animation: pulse 0.8s infinite alternate;
+    pointer-events: none;
+}
+
+#event-banner.hidden {
+    display: none;
+}
+
+@keyframes pulse {
+    from { transform: translateX(-50%) scale(1); }
+    to   { transform: translateX(-50%) scale(1.05); }
+}
+
+/* Панель достижений */
+#achievements-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 400px;
+    background: rgba(0, 20, 40, 0.98);
+    border: 2px solid #ffaa00;
+    border-radius: 10px;
+    padding: 20px;
+    z-index: 200;
+    text-align: center;
+}
+
+#achievements-screen.hidden {
+    display: none;
+}
+
+#achievements-screen h2 {
+    color: #ffaa00;
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+#achievements-screen ul {
+    list-style: none;
+    margin-bottom: 20px;
+    text-align: left;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#achievements-screen li {
+    padding: 8px;
+    border-bottom: 1px solid #003366;
+    font-size: 14px;
+}
+
+#achievements-screen li.locked {
+    color: #555;
+}
+
+#achievements-screen li.unlocked {
+    color: #00ff00;
+}
+
+#achievements-screen button {
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: bold;
+    background: #0055aa;
+    border: 1px solid #00ffff;
+    color: #ffffff;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* Экран результата */
 #result-screen {
     position: absolute;
     top: 0;
@@ -253,20 +350,9 @@ html, body {
 }
 
 @media (max-width: 600px) {
-    #top-bar h1 {
-        font-size: 14px;
-    }
-    #mission-info {
-        font-size: 11px;
-    }
-    .control-group label {
-        font-size: 12px;
-    }
-    .button-row button {
-        padding: 16px 4px;
-        font-size: 12px;
-    }
-    #telemetry {
-        font-size: 12px;
-    }
+    #top-bar h1 { font-size: 14px; }
+    #mission-info { font-size: 11px; }
+    .control-group label { font-size: 12px; }
+    .button-row button { padding: 16px 4px; font-size: 12px; }
+    #telemetry { font-size: 12px; }
 }
