@@ -12,7 +12,6 @@
         { count: 6, interval: 2, altitude: 550, title: 'Запустить 6 спутников' }
     ];
 
-    // Список достижений
     const ACHIEVEMENTS = [
         { id: 'first_launch', name: 'Первый запуск', desc: 'Запустить первую миссию' },
         { id: 'no_collisions', name: 'Чистое небо', desc: 'Пройти миссию без столкновений' },
@@ -24,7 +23,7 @@
 
     const PERSPECTIVE_TILT = 0.45;
     const DV_PER_CORRECTION = 10;
-    const DEBRIS_SPAWN_CHANCE = 0.008; // шанс появления мусора за кадр
+    const DEBRIS_SPAWN_CHANCE = 0.008;
 
     // --- DOM ---
     const canvas = document.getElementById('canvas');
@@ -42,12 +41,15 @@
     const correctBtn = document.getElementById('correct-btn');
     const resetBtn = document.getElementById('reset-btn');
     const resetCampaignBtn = document.getElementById('reset-campaign-btn');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
     const achievementsBtn = document.getElementById('achievements-btn');
     const closeAchievementsBtn = document.getElementById('close-achievements-btn');
+    const resetAllBtn = document.getElementById('reset-all-btn');
     const achievementsScreen = document.getElementById('achievements-screen');
     const achievementsList = document.getElementById('achievements-list');
     const eventBanner = document.getElementById('event-banner');
     const eventText = document.getElementById('event-text');
+    const hintBar = document.getElementById('hint-bar');
     const missionInfo = document.getElementById('mission-info');
     const timeValue = document.getElementById('time-value');
     const launchedValue = document.getElementById('launched-value');
@@ -83,27 +85,44 @@
         debris: [],
         debrisSpawned: false,
         unlockedAchievements: {},
-        correctionsMade: false
+        correctionsMade: false,
+        bestScore: 0
     };
 
     // ============================================================
-    // ДОСТИЖЕНИЯ
+    // ДОСТИЖЕНИЯ И РЕКОРД
     // ============================================================
-    function loadAchievements() {
+    function loadData() {
         try {
-            const saved = localStorage.getItem('satellite_achievements');
-            if (saved) {
-                game.unlockedAchievements = JSON.parse(saved);
+            const savedAch = localStorage.getItem('satellite_achievements');
+            if (savedAch) game.unlockedAchievements = JSON.parse(savedAch);
+            
+            const savedBest = localStorage.getItem('satellite_best_score');
+            if (savedBest) game.bestScore = parseInt(savedBest, 10) || 0;
+
+            const savedLevel = localStorage.getItem('satellite_campaign_level');
+            if (savedLevel !== null) {
+                const level = parseInt(savedLevel, 10);
+                if (level >= 0 && level < CAMPAIGN.length) game.currentLevel = level;
             }
-        } catch (e) {
-            game.unlockedAchievements = {};
-        }
+        } catch (e) {}
     }
 
     function saveAchievements() {
-        try {
-            localStorage.setItem('satellite_achievements', JSON.stringify(game.unlockedAchievements));
-        } catch (e) {}
+        try { localStorage.setItem('satellite_achievements', JSON.stringify(game.unlockedAchievements)); } catch (e) {}
+    }
+    
+    function saveBestScore(score) {
+        if (score > game.bestScore) {
+            game.bestScore = score;
+            try { localStorage.setItem('satellite_best_score', game.bestScore); } catch (e) {}
+            return true;
+        }
+        return false;
+    }
+
+    function saveProgress() {
+        try { localStorage.setItem('satellite_campaign_level', game.currentLevel); } catch (e) {}
     }
 
     function unlockAchievement(id) {
@@ -124,8 +143,52 @@
         }
     }
 
+    function resetAllData() {
+        if (!confirm('Вы уверены? Это удалит ВСЕ достижения, рекорды и прогресс кампании.')) return;
+        localStorage.clear();
+        game.unlockedAchievements = {};
+        game.bestScore = 0;
+        game.currentLevel = 0;
+        achievementsScreen.classList.add('hidden');
+        applyLevel();
+        resetGame();
+        showBanner('Все данные сброшены');
+    }
+
     // ============================================================
-    // БАННЕР СОБЫТИЙ
+    // ПОДСКАЗКИ (UX)
+    // ============================================================
+    function updateHint() {
+        if (game.finished) {
+            hintBar.textContent = 'Миссия завершена. Нажмите «Следующая» или «Заново».';
+            return;
+        }
+        if (game.paused) {
+            hintBar.textContent = 'ПАУЗА. Нажмите «Продолжить», чтобы вернуться в игру.';
+            return;
+        }
+        if (!game.running) {
+            hintBar.textContent = 'Настройте параметры и нажмите «Запуск».';
+            startBtn.classList.add('glow');
+            correctBtn.classList.remove('glow');
+            pauseBtn.classList.remove('glow');
+            return;
+        }
+
+        startBtn.classList.remove('glow');
+        pauseBtn.classList.remove('glow');
+
+        if (game.selectedSatellite) {
+            hintBar.textContent = 'Спутник выбран. Нажмите «Коррекция», чтобы ускорить его (тратит ΔV).';
+            correctBtn.classList.add('glow');
+        } else {
+            hintBar.textContent = 'Кликните (или тапните) по спутнику, чтобы выбрать его.';
+            correctBtn.classList.remove('glow');
+        }
+    }
+
+    // ============================================================
+    // БАННЕР
     // ============================================================
     let bannerTimer = null;
     function showBanner(text) {
@@ -138,23 +201,8 @@
     }
 
     // ============================================================
-    // ПРОГРЕСС КАМПАНИИ
+    // УРОВНИ
     // ============================================================
-    function loadProgress() {
-        try {
-            const saved = localStorage.getItem('satellite_campaign_level');
-            if (saved !== null) {
-                const level = parseInt(saved, 10);
-                if (level >= 0 && level < CAMPAIGN.length) game.currentLevel = level;
-            }
-        } catch (e) { game.currentLevel = 0; }
-    }
-
-    function saveProgress() {
-        try { localStorage.setItem('satellite_campaign_level', game.currentLevel); }
-        catch (e) {}
-    }
-
     function applyLevel() {
         const level = CAMPAIGN[game.currentLevel];
         if (!level) return;
@@ -170,9 +218,9 @@
         game.targetAltitude = level.altitude;
         game.launchInterval = level.interval;
 
-        missionInfo.textContent =
-            'Миссия ' + (game.currentLevel + 1) + ' / ' + CAMPAIGN.length + ' — ' + level.title;
+        missionInfo.textContent = 'Миссия ' + (game.currentLevel + 1) + ' / ' + CAMPAIGN.length + ' — ' + level.title;
         launchedValue.textContent = '0 / ' + level.count;
+        updateHint();
     }
 
     // ============================================================
@@ -222,7 +270,7 @@
     }
 
     // ============================================================
-    // КОСМИЧЕСКИЙ МУСОР
+    // МУСОР
     // ============================================================
     function spawnDebris() {
         const angle = Math.random() * Math.PI * 2;
@@ -231,14 +279,13 @@
             angle: angle,
             radius: radius,
             speed: 0.4 + Math.random() * 0.6,
-            life: 15 // живёт 15 секунд
+            life: 15
         });
         game.debrisSpawned = true;
         showBanner('⚠ Внимание! Космический мусор!');
     }
 
     function updateDebris(dt) {
-        // Удаляем старый мусор
         for (let i = game.debris.length - 1; i >= 0; i--) {
             const d = game.debris[i];
             d.life -= dt;
@@ -246,7 +293,6 @@
             if (d.angle > Math.PI * 2) d.angle -= Math.PI * 2;
             if (d.life <= 0) {
                 game.debris.splice(i, 1);
-                // Игрок пережил мусор — даём ачивку
                 unlockAchievement('dodger');
             }
         }
@@ -269,7 +315,6 @@
             if (game.satellites.length === 1) unlockAchievement('first_launch');
         }
 
-        // Шанс появления мусора
         if (!game.debrisSpawned && Math.random() < DEBRIS_SPAWN_CHANCE) {
             spawnDebris();
         }
@@ -290,6 +335,7 @@
 
         checkCollisions();
         updateSelectedInfo();
+        updateHint();
 
         timeValue.textContent = game.time.toFixed(1);
         dvValue.textContent = game.totalDV;
@@ -312,11 +358,7 @@
         const altitudeKm = Math.round((sat.radius - game.earthRadius) * 10);
         const speedPercent = Math.round(sat.speedMultiplier * 100);
         selectedValue.textContent =
-            'SAT-' + sat.id +
-            ' | Высота: ' + altitudeKm + ' км' +
-            ' | Скорость: ' + speedPercent + '%' +
-            ' | Топливо: ' + sat.fuel + ' ед.' +
-            ' | ΔV: ' + sat.spentDV;
+            'SAT-' + sat.id + ' | Высота: ' + altitudeKm + ' км | Скорость: ' + speedPercent + '% | Топливо: ' + sat.fuel + ' ед. | ΔV: ' + sat.spentDV;
         selectedInfo.classList.remove('hidden');
     }
 
@@ -340,15 +382,13 @@
     }
 
     // ============================================================
-    // ОТРИСОВКА (псевдо-3D)
+    // ОТРИСОВКА
     // ============================================================
     function render() {
         const w = canvas.width, h = canvas.height;
         const cx = w / 2, cy = h / 2;
-
         ctx.clearRect(0, 0, w, h);
 
-        // Звёзды
         const tSec = performance.now() / 1000;
         for (let i = 0; i < game.stars.length; i++) {
             const st = game.stars[i];
@@ -410,7 +450,7 @@
             }
         }
 
-        // Дуги углов
+        // Дуги
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
@@ -455,19 +495,16 @@
                 const size = (1 + (t / sat.trail.length) * 3) * (1 + Math.sin(p.angle) * 0.3);
                 ctx.beginPath();
                 ctx.arc(px, py, Math.max(0.5, size), 0, Math.PI * 2);
-                ctx.fillStyle = sat === game.selectedSatellite
-                    ? 'rgba(255, 255, 255, ' + alpha + ')'
-                    : 'rgba(0, 255, 255, ' + alpha + ')';
+                ctx.fillStyle = sat === game.selectedSatellite ? 'rgba(255, 255, 255, ' + alpha + ')' : 'rgba(0, 255, 255, ' + alpha + ')';
                 ctx.fill();
             }
         }
 
-        // Космический мусор
+        // Мусор
         for (let i = 0; i < game.debris.length; i++) {
             const d = game.debris[i];
             const x = cx + Math.cos(d.angle) * d.radius;
             const y = cy + Math.sin(d.angle) * d.radius * PERSPECTIVE_TILT;
-            // Вращающийся крестик
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(d.angle * 3);
@@ -486,7 +523,6 @@
             const x = cx + Math.cos(sat.angle) * sat.radius;
             const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
 
-            // Тень
             ctx.beginPath();
             ctx.ellipse(x + 2, y + 4, 7, 4, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -525,7 +561,7 @@
     }
 
     // ============================================================
-    // ИГРОВОЙ ЦИКЛ
+    // ЦИКЛ И КЛИК
     // ============================================================
     let lastTime = performance.now();
     function loop(now) {
@@ -536,9 +572,6 @@
         requestAnimationFrame(loop);
     }
 
-    // ============================================================
-    // КЛИК
-    // ============================================================
     function handleCanvasClick(event) {
         if (!game.running || game.finished) return;
 
@@ -558,9 +591,8 @@
         }
 
         if (found) {
-            if (game.selectedSatellite === found) {
-                clearSelection();
-            } else {
+            if (game.selectedSatellite === found) clearSelection();
+            else {
                 game.selectedSatellite = found;
                 correctBtn.disabled = false;
             }
@@ -568,6 +600,7 @@
             clearSelection();
         }
         updateSelectedInfo();
+        updateHint();
     }
 
     function clearSelection() {
@@ -577,7 +610,7 @@
     }
 
     // ============================================================
-    // КОРРЕКЦИЯ
+    // КОРРЕКЦИЯ И ЗАВЕРШЕНИЕ
     // ============================================================
     function correctSelected() {
         if (!game.selectedSatellite) return;
@@ -594,9 +627,6 @@
         updateSelectedInfo();
     }
 
-    // ============================================================
-    // ЗАВЕРШЕНИЕ
-    // ============================================================
     function finishGame() {
         game.running = false;
         game.finished = true;
@@ -611,13 +641,14 @@
         const fuelBonus = Math.max(0, 100 - game.totalDV);
         const score = (game.satellites.length * 100) - (game.collisions * 200) + altitudeBonus + fuelBonus;
 
+        const isNewRecord = saveBestScore(score);
+
         let message = '';
         if (success && altitudeBonus > 0) message = 'Все спутники на разных орбитах без столкновений!';
         else if (success) message = 'Все спутники успешно выведены без столкновений!';
         else if (game.collisions > 0) message = 'Столкновений: ' + game.collisions;
         else message = 'Не все спутники выведены.';
 
-        // Достижения
         if (success && game.collisions === 0) unlockAchievement('no_collisions');
         if (success && !game.correctionsMade) unlockAchievement('no_corrections');
         if (game.satellites.length >= 5) unlockAchievement('many_satellites');
@@ -627,7 +658,8 @@
 
         resultTitle.textContent = success ? 'УСПЕХ' : 'НЕУДАЧА';
         resultTitle.style.color = success ? '#00ff00' : '#ff4444';
-        resultText.innerHTML =
+        
+        let resultHTML =
             message + '<br><br>' +
             '<strong>Итоговый балл:</strong> ' + score + '<br>' +
             'Время миссии: ' + game.time.toFixed(1) + ' с<br>' +
@@ -636,12 +668,17 @@
             'Суммарный ΔV: ' + game.totalDV + '<br>' +
             'Бонус за высоты: ' + altitudeBonus + '<br>' +
             'Бонус за экономию: ' + fuelBonus;
-
-        if (success && hasNext) {
-            resultNextBtn.classList.remove('hidden');
+            
+        if (isNewRecord) {
+            resultHTML += '<br><div class="record-text">🏆 НОВЫЙ РЕКОРД!</div>';
         } else {
-            resultNextBtn.classList.add('hidden');
+            resultHTML += '<br><div class="record-text">Лучший результат: ' + game.bestScore + '</div>';
         }
+
+        resultText.innerHTML = resultHTML;
+
+        if (success && hasNext) resultNextBtn.classList.remove('hidden');
+        else resultNextBtn.classList.add('hidden');
 
         if (success && hasNext) {
             game.currentLevel++;
@@ -652,10 +689,11 @@
         startBtn.disabled = true;
         pauseBtn.disabled = true;
         clearSelection();
+        updateHint();
     }
 
     // ============================================================
-    // СТАРТ / СБРОС
+    // СТАРТ / СБРОС / ПАУЗА
     // ============================================================
     function startGame() {
         if (game.running) return;
@@ -685,6 +723,7 @@
         pauseBtn.disabled = false;
         pauseBtn.textContent = 'Пауза';
         clearSelection();
+        updateHint();
 
         lastTime = performance.now();
     }
@@ -693,6 +732,7 @@
         if (!game.running || game.finished) return;
         game.paused = !game.paused;
         pauseBtn.textContent = game.paused ? 'Продолжить' : 'Пауза';
+        updateHint();
     }
 
     function resetGame() {
@@ -718,6 +758,7 @@
         pauseBtn.disabled = true;
         pauseBtn.textContent = 'Пауза';
         clearSelection();
+        updateHint();
         render();
     }
 
@@ -735,22 +776,26 @@
         resetGame();
     }
 
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                alert("Ошибка при попытке включить полноэкранный режим: " + err.message);
+            });
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+
     // ============================================================
     // ОБРАБОТЧИКИ
     // ============================================================
-    altitudeSlider.addEventListener('input', function () {
-        altitudeValue.textContent = this.value;
-    });
-    impulseSlider.addEventListener('input', function () {
-        impulseValue.textContent = this.value;
-    });
+    altitudeSlider.addEventListener('input', function () { altitudeValue.textContent = this.value; });
+    impulseSlider.addEventListener('input', function () { impulseValue.textContent = this.value; });
     countSlider.addEventListener('input', function () {
         countValue.textContent = this.value;
         launchedValue.textContent = '0 / ' + this.value;
     });
-    intervalSlider.addEventListener('input', function () {
-        intervalValue.textContent = this.value;
-    });
+    intervalSlider.addEventListener('input', function () { intervalValue.textContent = this.value; });
 
     startBtn.addEventListener('click', startGame);
     pauseBtn.addEventListener('click', togglePause);
@@ -759,6 +804,8 @@
     resetCampaignBtn.addEventListener('click', resetCampaign);
     resultResetBtn.addEventListener('click', resetGame);
     resultNextBtn.addEventListener('click', nextMission);
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    
     achievementsBtn.addEventListener('click', function () {
         renderAchievements();
         achievementsScreen.classList.remove('hidden');
@@ -766,6 +813,7 @@
     closeAchievementsBtn.addEventListener('click', function () {
         achievementsScreen.classList.add('hidden');
     });
+    resetAllBtn.addEventListener('click', resetAllData);
 
     canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('touchstart', function (e) {
@@ -806,11 +854,10 @@
     });
 
     // ============================================================
-    // СТАРТ
+    // ИНИЦИАЛИЗАЦИЯ
     // ============================================================
     createStars();
-    loadProgress();
-    loadAchievements();
+    loadData();
     applyLevel();
     resizeCanvas();
     requestAnimationFrame(loop);
