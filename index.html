@@ -32,12 +32,9 @@
         </main>
 
         <section id="controls">
-            <!-- Выбор типа спутника (характеристики) -->
-            <div class="sat-types-row">
-                <button class="sat-type active" data-type="standard">Стандарт</button>
-                <button class="sat-type" data-type="fast">Быстрый (мало топлива)</button>
-                <button class="sat-type" data-type="heavy">Тяжёлый (много топлива)</button>
-            </div>
+            <!-- Очередь спутников -->
+            <div class="queue-label">Очередь запуска (нажмите, чтобы сменить тип):</div>
+            <div id="satellite-queue" class="queue-container"></div>
 
             <div class="sliders-grid">
                 <div class="control-group">
@@ -64,6 +61,7 @@
             <div class="button-row main-actions">
                 <button id="start-btn" class="primary">ЗАПУСК</button>
                 <button id="pause-btn" disabled>ПАУЗА</button>
+                <button id="correct-btn" disabled style="background:#333; border-color:#555;">КОРРЕКЦИЯ</button>
                 <button id="reset-btn">ЗАНОВО</button>
             </div>
         </section>
