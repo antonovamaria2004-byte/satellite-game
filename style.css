@@ -74,9 +74,7 @@ html, body {
     min-width: 180px;
 }
 
-#side-menu.hidden {
-    display: none;
-}
+#side-menu.hidden { display: none; }
 
 #side-menu button {
     padding: 10px;
@@ -124,7 +122,7 @@ html, body {
 .queue-container {
     display: flex;
     gap: 4px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     overflow-x: auto;
     padding-bottom: 2px;
 }
@@ -156,14 +154,43 @@ html, body {
     transform: scale(1.1);
 }
 
+.queue-btn.selected-for-setup {
+    box-shadow: 0 0 15px #ffffff;
+    border-color: #ffffff;
+}
+
 .queue-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
+/* Новая панель настройки */
+#setup-panel {
+    background: #002244;
+    border: 1px solid #00ffff;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+#setup-panel.hidden {
+    display: none;
+}
+
+.setup-title {
+    font-size: 12px;
+    color: #00ffff;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+#setup-panel .control-group {
+    margin-bottom: 0;
+}
+
 .sliders-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px 12px;
     margin-bottom: 12px;
 }
@@ -293,13 +320,9 @@ html, body {
     margin-top: 4px;
 }
 
-#selected-info.hidden {
-    display: none;
-}
+#selected-info.hidden { display: none; }
 
-.hidden {
-    display: none !important;
-}
+.hidden { display: none !important; }
 
 /* Баннер событий */
 #event-banner {
