@@ -32,16 +32,19 @@
         </main>
 
         <section id="controls">
-            <!-- Очередь спутников -->
-            <div class="queue-label">Очередь запуска (нажмите, чтобы сменить тип):</div>
+            <div class="queue-label">Очередь запуска (нажмите, чтобы настроить):</div>
             <div id="satellite-queue" class="queue-container"></div>
 
-            <div class="sliders-grid">
+            <!-- Панель настройки выбранного в очереди спутника -->
+            <div id="setup-panel" class="hidden">
+                <div class="setup-title">Настройка SAT-<span id="setup-id">1</span></div>
                 <div class="control-group">
-                    <label for="altitude">Высота: <span id="altitude-value">400</span> км</label>
-                    <input type="range" id="altitude" min="200" max="800" value="400" step="10">
+                    <label for="setup-altitude">Высота: <span id="setup-altitude-value">400</span> км</label>
+                    <input type="range" id="setup-altitude" min="200" max="800" value="400" step="10">
                 </div>
+            </div>
 
+            <div class="sliders-grid">
                 <div class="control-group">
                     <label for="impulse">Импульс: <span id="impulse-value">50</span>%</label>
                     <input type="range" id="impulse" min="10" max="100" value="50" step="1">
