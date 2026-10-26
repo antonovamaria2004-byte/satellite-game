@@ -35,8 +35,6 @@
     // --- DOM ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const altitudeSlider = document.getElementById('altitude');
-    const altitudeValue = document.getElementById('altitude-value');
     const impulseSlider = document.getElementById('impulse');
     const impulseValue = document.getElementById('impulse-value');
     const countSlider = document.getElementById('count');
@@ -75,6 +73,11 @@
     const resultNextBtn = document.getElementById('result-next-btn');
     const resultResetBtn = document.getElementById('result-reset-btn');
     const queueContainer = document.getElementById('satellite-queue');
+    
+    const setupPanel = document.getElementById('setup-panel');
+    const setupId = document.getElementById('setup-id');
+    const setupAltitude = document.getElementById('setup-altitude');
+    const setupAltitudeValue = document.getElementById('setup-altitude-value');
 
     // --- Состояние ---
     const game = {
@@ -83,7 +86,7 @@
         finished: false,
         time: 0,
         flightTimeLimit: 30,
-        targetAltitude: 300,
+        targetAltitude: 300, // Базовая высота миссии
         impulse: 50,
         totalSatellites: 2,
         launchInterval: 5,
@@ -101,7 +104,8 @@
         unlockedAchievements: {},
         correctionsMade: false,
         bestScore: 0,
-        launchQueue: [] // Массив с типами для каждого слота
+        launchQueue: [], // Массив объектов: { type: 'standard', altitude: 400 }
+        selectedQueueIndex: -1 // Какой слот сейчас настраивается
     };
 
     // ============================================================
@@ -174,13 +178,22 @@
     }
 
     // ============================================================
-    // ОЧЕРЕДЬ СПУТНИКОВ
+    // ОЧЕРЕДЬ И НАСТРОЙКА СПУТНИКОВ
     // ============================================================
     function initQueue(count) {
         game.launchQueue = [];
+        const defaultAlt = parseInt(document.getElementById('setup-altitude')?.value || 400, 10);
+        const missionAlt = CAMPAIGN[game.currentLevel]?.altitude || 400;
+        
         for (let i = 0; i < count; i++) {
-            game.launchQueue.push('standard'); // По умолчанию все стандартные
+            // Каждому следующему даем небольшую разницу в высоте по умолчанию, чтобы они не слипались
+            game.launchQueue.push({ 
+                type: 'standard', 
+                altitude: missionAlt + (i * 30) // 400, 430, 460...
+            });
         }
+        game.selectedQueueIndex = -1;
+        setupPanel.classList.add('hidden');
         renderQueue();
     }
 
@@ -190,25 +203,61 @@
         
         for (let i = 0; i < game.totalSatellites; i++) {
             const btn = document.createElement('button');
-            const type = game.launchQueue[i] || 'standard';
-            btn.className = `queue-btn ${type}`;
+            const item = game.launchQueue[i] || { type: 'standard', altitude: 400 };
+            btn.className = `queue-btn ${item.type}`;
+            
+            // Подсветка, если выбран для настройки
+            if (i === game.selectedQueueIndex) {
+                btn.classList.add('selected-for-setup');
+            }
+            
             btn.textContent = i + 1;
             
-            // Если спутник уже запущен, блокируем кнопку
+            // Если спутник уже запущен, блокируем
             if (i < game.satellites.length && game.running) {
                 btn.disabled = true;
             } else if (!game.running) {
                 btn.onclick = () => {
-                    // Меняем тип по кругу
-                    const currentIndex = types.indexOf(game.launchQueue[i]);
-                    const nextIndex = (currentIndex + 1) % types.length;
-                    game.launchQueue[i] = types[nextIndex];
-                    renderQueue(); // Перерисовываем
+                    // Если кликнули по тому же - меняем тип. Если по другому - открываем настройку.
+                    if (game.selectedQueueIndex === i) {
+                        // Меняем тип по кругу
+                        const currentIndex = types.indexOf(game.launchQueue[i].type);
+                        const nextIndex = (currentIndex + 1) % types.length;
+                        game.launchQueue[i].type = types[nextIndex];
+                    } else {
+                        // Выбираем для настройки
+                        game.selectedQueueIndex = i;
+                    }
+                    renderQueue();
+                    updateSetupPanel();
                 };
             }
             queueContainer.appendChild(btn);
         }
     }
+
+    function updateSetupPanel() {
+        if (game.selectedQueueIndex === -1 || game.running) {
+            setupPanel.classList.add('hidden');
+            return;
+        }
+        
+        const item = game.launchQueue[game.selectedQueueIndex];
+        setupPanel.classList.remove('hidden');
+        setupId.textContent = game.selectedQueueIndex + 1;
+        setupAltitude.value = item.altitude;
+        setupAltitudeValue.textContent = item.altitude;
+    }
+
+    // Обработчик ползунка высоты в панели настройки
+    setupAltitude.addEventListener('input', function () {
+        if (game.selectedQueueIndex !== -1) {
+            game.launchQueue[game.selectedQueueIndex].altitude = parseInt(this.value, 10);
+            setupAltitudeValue.textContent = this.value;
+            // Обновим пунктирные орбиты, если миссия еще не запущена
+            if (!game.running) render();
+        }
+    });
 
     // ============================================================
     // UX ПОДСКАЗКИ
@@ -223,8 +272,12 @@
             return;
         }
         if (!game.running) {
-            hintBar.textContent = 'Настройте очередь и нажмите «Запуск».';
-            startBtn.classList.add('glow');
+            if (game.selectedQueueIndex !== -1) {
+                hintBar.textContent = 'Настройте высоту и нажмите на кружок еще раз, чтобы сменить тип.';
+            } else {
+                hintBar.textContent = 'Настройте очередь и нажмите «Запуск».';
+                startBtn.classList.add('glow');
+            }
             return;
         }
         startBtn.classList.remove('glow');
@@ -256,8 +309,6 @@
         const level = CAMPAIGN[game.currentLevel];
         if (!level) return;
 
-        altitudeSlider.value = level.altitude;
-        altitudeValue.textContent = level.altitude;
         countSlider.value = level.count;
         countValue.textContent = level.count;
         intervalSlider.value = level.interval;
@@ -317,19 +368,16 @@
         const impulseFactor = game.impulse / 100;
         const startRadius = 40 + impulseFactor * 60;
         const startAngle = (Math.PI * 2 / game.totalSatellites) * index;
-        const heightStep = game.totalSatellites > 4 ? 20 : 30;
-        const altitudeOffset = index * heightStep;
         
-        // Берем тип из очереди!
-        const typeKey = game.launchQueue[index] || 'standard';
-        const typeParams = SAT_TYPES[typeKey];
+        // Берем данные из очереди!
+        const queueItem = game.launchQueue[index] || { type: 'standard', altitude: game.targetAltitude };
+        const typeParams = SAT_TYPES[queueItem.type];
 
         return {
             id: index + 1,
             angle: startAngle,
             radius: startRadius,
-            targetRadius: game.earthRadius + (game.targetAltitude + altitudeOffset) / 10,
-            altitudeOffset: altitudeOffset,
+            targetRadius: game.earthRadius + queueItem.altitude / 10, // Высота из настроек!
             baseSpeed: (0.8 + impulseFactor * 1.2) * typeParams.speed,
             speedMultiplier: 1.0,
             maxFuel: typeParams.fuel,
@@ -386,7 +434,7 @@
             game.lastLaunchTime = game.time;
             launchedValue.textContent = game.satellites.length + ' / ' + game.totalSatellites;
             if (game.satellites.length === 1) unlockAchievement('first_launch');
-            renderQueue(); // Обновляем очередь (блокируем запущенные)
+            renderQueue();
         }
 
         if (!game.debrisSpawned && Math.random() < DEBRIS_SPAWN_CHANCE) {
@@ -541,18 +589,23 @@
         ctx.fillStyle = haloGrad;
         ctx.fill();
 
-        // Орбиты
-        if (game.running && game.satellites.length > 0) {
-            for (let i = 0; i < game.satellites.length; i++) {
-                const targetR = game.satellites[i].targetRadius;
-                ctx.beginPath();
-                ctx.setLineDash([5, 5]);
-                ctx.ellipse(cx, cy, targetR, targetR * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
+        // Пунктирные орбиты (появляются сразу, чтобы видеть настройки)
+        for (let i = 0; i < game.launchQueue.length; i++) {
+            if (i < game.satellites.length && game.running) continue; // Уже запущенные не рисуем пунктиром
+            const item = game.launchQueue[i];
+            if (!item) continue;
+            const targetR = game.earthRadius + item.altitude / 10;
+            
+            // Подсветим ту орбиту, которую настраиваем сейчас
+            const isSelected = (i === game.selectedQueueIndex && !game.running);
+            
+            ctx.beginPath();
+            ctx.setLineDash(isSelected ? [10, 5] : [5, 5]);
+            ctx.ellipse(cx, cy, targetR, targetR * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = isSelected ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 255, 255, 0.15)';
+            ctx.lineWidth = isSelected ? 2 : 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
 
         // Дуги опасности
@@ -586,11 +639,11 @@
                 const alpha = (t / sat.trail.length) * 0.4;
                 ctx.beginPath();
                 ctx.arc(px, py, 1 + (t / sat.trail.length) * 2, 0, Math.PI * 2);
-                ctx.fillStyle = sat === game.selectedSatellite ? `rgba(255,255,255,${alpha})` : `${sat.color.replace(')', `,${alpha})`).replace('rgb', 'rgba')}`;
-                // Fallback если цвет hex
-                if (sat.color.startsWith('#')) {
-                     ctx.fillStyle = sat === game.selectedSatellite ? `rgba(255,255,255,${alpha})` : `rgba(0, 255, 255, ${alpha})`;
-                }
+                
+                // Упрощенный парсинг цвета для следов
+                ctx.fillStyle = sat === game.selectedSatellite ? `rgba(255,255,255,${alpha})` : 
+                                (sat.color === '#00ffff' ? `rgba(0,255,255,${alpha})` : 
+                                (sat.color === '#ffaa00' ? `rgba(255,170,0,${alpha})` : `rgba(255,68,68,${alpha})`));
                 ctx.fill();
             }
         }
@@ -768,23 +821,22 @@
         game.finished = false;
         game.time = 0;
         game.lastLaunchTime = 0;
-        game.targetAltitude = parseInt(altitudeSlider.value, 10);
         game.impulse = parseInt(impulseSlider.value, 10);
-        // game.totalSatellites = parseInt(countSlider.value, 10); // Берем из applyLevel или слайдера
         game.launchInterval = parseInt(intervalSlider.value, 10);
+        
+        const sliderCount = parseInt(countSlider.value, 10);
+        if (sliderCount !== game.totalSatellites) {
+             game.totalSatellites = sliderCount;
+             initQueue(sliderCount);
+        }
+
         game.satellites = [];
         game.collisions = 0;
         game.totalDV = 0;
         game.debris = [];
         game.debrisSpawned = false;
         game.correctionsMade = false;
-
-        // Если пользователь изменил ползунок, мы можем обновить очередь
-        const sliderCount = parseInt(countSlider.value, 10);
-        if (sliderCount !== game.totalSatellites) {
-             game.totalSatellites = sliderCount;
-             initQueue(sliderCount); // Сбросим очередь
-        }
+        game.selectedQueueIndex = -1;
 
         resultScreen.classList.add('hidden');
         collisionValue.textContent = '0';
@@ -797,6 +849,7 @@
         clearSelection();
         updateHint();
         renderQueue();
+        setupPanel.classList.add('hidden');
 
         lastTime = performance.now();
     }
@@ -819,6 +872,7 @@
         game.debris = [];
         game.debrisSpawned = false;
         game.correctionsMade = false;
+        game.selectedQueueIndex = -1;
 
         resultScreen.classList.add('hidden');
         timeValue.textContent = '0.0';
@@ -832,6 +886,7 @@
         clearSelection();
         updateHint();
         renderQueue();
+        setupPanel.classList.add('hidden');
         render();
     }
 
@@ -860,14 +915,12 @@
     // ============================================================
     // ОБРАБОТЧИКИ
     // ============================================================
-    
-    altitudeSlider.addEventListener('input', function () { altitudeValue.textContent = this.value; });
     impulseSlider.addEventListener('input', function () { impulseValue.textContent = this.value; });
     countSlider.addEventListener('input', function () {
         countValue.textContent = this.value;
         launchedValue.textContent = '0 / ' + this.value;
         game.totalSatellites = parseInt(this.value, 10);
-        initQueue(game.totalSatellites); // Пересоздаем очередь при смене ползунка
+        initQueue(game.totalSatellites); 
     });
     intervalSlider.addEventListener('input', function () { intervalValue.textContent = this.value; });
 
@@ -902,9 +955,7 @@
     }, { passive: true });
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowUp') { altitudeSlider.value = Math.min(800, parseInt(altitudeSlider.value, 10) + 10); altitudeValue.textContent = altitudeSlider.value; e.preventDefault(); }
-        else if (e.key === 'ArrowDown') { altitudeSlider.value = Math.max(200, parseInt(altitudeSlider.value, 10) - 10); altitudeValue.textContent = altitudeSlider.value; e.preventDefault(); }
-        else if (e.key === 'ArrowRight') { impulseSlider.value = Math.min(100, parseInt(impulseSlider.value, 10) + 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
+        if (e.key === 'ArrowRight') { impulseSlider.value = Math.min(100, parseInt(impulseSlider.value, 10) + 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { impulseSlider.value = Math.max(10, parseInt(impulseSlider.value, 10) - 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
         else if (e.key === ' ') { if (!game.running) startGame(); else togglePause(); e.preventDefault(); }
         else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') { resetGame(); e.preventDefault(); }
