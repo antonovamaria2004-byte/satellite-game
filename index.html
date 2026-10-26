@@ -16,8 +16,8 @@
             <div id="mission-info">Миссия 1 / 5 — Запустить 2 спутника</div>
         </header>
 
+        <!-- Выезжающее меню -->
         <div id="side-menu" class="hidden">
-            <button id="guide-btn">📖 Руководство</button>
             <button id="achievements-btn">🏆 Достижения</button>
             <button id="reset-campaign-btn" class="danger">🔄 Сбросить кампанию</button>
             <button id="fullscreen-btn">⛶ На весь экран</button>
@@ -35,17 +35,12 @@
             <div class="queue-label">Очередь запуска (нажмите, чтобы настроить):</div>
             <div id="satellite-queue" class="queue-container"></div>
 
-            <!-- Панель настройки спутника -->
+            <!-- Панель настройки выбранного в очереди спутника -->
             <div id="setup-panel" class="hidden">
                 <div class="setup-title">Настройка SAT-<span id="setup-id">1</span></div>
-                <div class="setup-grid">
-                    <div class="control-group" style="grid-column: span 2;">
-                        <label>Высота орбиты: <span id="setup-alt-val">400</span> км</label>
-                        <input type="range" id="setup-alt" min="200" max="800" value="400" step="10">
-                    </div>
-                </div>
-                <div class="button-row" style="margin-top: 5px;">
-                    <button id="setup-engine" class="engine-btn">Двигатель: Хим (мощный)</button>
+                <div class="control-group">
+                    <label for="setup-altitude">Высота: <span id="setup-altitude-value">400</span> км</label>
+                    <input type="range" id="setup-altitude" min="200" max="800" value="400" step="10">
                 </div>
             </div>
 
@@ -54,10 +49,12 @@
                     <label for="impulse">Импульс: <span id="impulse-value">50</span>%</label>
                     <input type="range" id="impulse" min="10" max="100" value="50" step="1">
                 </div>
+
                 <div class="control-group">
                     <label for="count">Кол-во: <span id="count-value">3</span></label>
                     <input type="range" id="count" min="1" max="8" value="3" step="1">
                 </div>
+
                 <div class="control-group">
                     <label for="interval">Интервал: <span id="interval-value">4</span> с</label>
                     <input type="range" id="interval" min="1" max="15" value="4" step="1">
@@ -82,22 +79,8 @@
             <div id="selected-info" class="hidden">Выбран: <span id="selected-value">—</span></div>
         </section>
 
-        <!-- Экран руководства -->
-        <div id="guide-screen" class="hidden modal-screen">
-            <h2>📖 Руководство</h2>
-            <div class="guide-text">
-                <p><strong>1. Очередь:</strong> Нажимайте на кружки 1, 2, 3, чтобы настроить каждый спутник.</p>
-                <p><strong>2. Двигатели:</strong></p>
-                <ul>
-                    <li><strong>Хим (мощный):</strong> Дает большой рывок скорости (+20%), но быстро тратит топливо.</li>
-                    <li><strong>Ион (эконом):</strong> Дает маленький рывок (+2%), но тратит очень мало топлива.</li>
-                </ul>
-                <p><strong>3. Фазирование:</strong> Настраивайте высоту и интервал так, чтобы спутники не догоняли друг друга (следите за красными дугами).</p>
-            </div>
-            <button id="close-guide-btn">Понятно</button>
-        </div>
-
-        <div id="achievements-screen" class="hidden modal-screen">
+        <!-- Панель достижений -->
+        <div id="achievements-screen" class="hidden">
             <h2>Достижения</h2>
             <ul id="achievements-list"></ul>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
@@ -106,7 +89,8 @@
             </div>
         </div>
 
-        <div id="result-screen" class="hidden modal-screen">
+        <!-- Экран результата -->
+        <div id="result-screen" class="hidden">
             <h2 id="result-title">Результат</h2>
             <p id="result-text"></p>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
