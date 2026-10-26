@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Спутниковая группировка PRO</title>
+    <title>Спутниковая группировка</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -39,17 +39,9 @@
             <div id="setup-panel" class="hidden">
                 <div class="setup-title">Настройка SAT-<span id="setup-id">1</span></div>
                 <div class="setup-grid">
-                    <div class="control-group">
-                        <label>Высота: <span id="setup-alt-val">400</span> км</label>
+                    <div class="control-group" style="grid-column: span 2;">
+                        <label>Высота орбиты: <span id="setup-alt-val">400</span> км</label>
                         <input type="range" id="setup-alt" min="200" max="800" value="400" step="10">
-                    </div>
-                    <div class="control-group">
-                        <label>Наклон: <span id="setup-inc-val">0</span>°</label>
-                        <input type="range" id="setup-inc" min="0" max="90" value="0" step="10">
-                    </div>
-                    <div class="control-group">
-                        <label>Обзор: <span id="setup-cam-val">Стандарт</span></label>
-                        <input type="range" id="setup-cam" min="0" max="2" value="1" step="1">
                     </div>
                 </div>
                 <div class="button-row" style="margin-top: 5px;">
@@ -87,7 +79,6 @@
             <div>Запущено: <span id="launched-value">0 / 3</span></div>
             <div>Столкновений: <span id="collision-value">0</span></div>
             <div>ΔV: <span id="dv-value">0</span></div>
-            <div>Покрытие: <span id="coverage-value">0%</span></div>
             <div id="selected-info" class="hidden">Выбран: <span id="selected-value">—</span></div>
         </section>
 
@@ -96,10 +87,12 @@
             <h2>📖 Руководство</h2>
             <div class="guide-text">
                 <p><strong>1. Очередь:</strong> Нажимайте на кружки 1, 2, 3, чтобы настроить каждый спутник.</p>
-                <p><strong>2. Наклон:</strong> Спутники с разным наклоном (например, 0° и 90°) не сталкиваются.</p>
-                <p><strong>3. Тень Земли:</strong> Левый тёмный сектор. В тени садится батарея. Без энергии коррекция не работает!</p>
-                <p><strong>4. Двигатель:</strong> Хим (быстро, но ест топливо) или Ион (медленно, но экономично).</p>
-                <p><strong>5. Обзор:</strong> Круги вокруг спутников — это их камеры. Больше покрытие — лучше.</p>
+                <p><strong>2. Двигатели:</strong></p>
+                <ul>
+                    <li><strong>Хим (мощный):</strong> Дает большой рывок скорости (+20%), но быстро тратит топливо.</li>
+                    <li><strong>Ион (эконом):</strong> Дает маленький рывок (+2%), но тратит очень мало топлива.</li>
+                </ul>
+                <p><strong>3. Фазирование:</strong> Настраивайте высоту и интервал так, чтобы спутники не догоняли друг друга (следите за красными дугами).</p>
             </div>
             <button id="close-guide-btn">Понятно</button>
         </div>
