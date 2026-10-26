@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Спутниковая группировка</title>
+    <title>Спутниковая группировка PRO</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,8 +16,8 @@
             <div id="mission-info">Миссия 1 / 5 — Запустить 2 спутника</div>
         </header>
 
-        <!-- Выезжающее меню -->
         <div id="side-menu" class="hidden">
+            <button id="guide-btn">📖 Руководство</button>
             <button id="achievements-btn">🏆 Достижения</button>
             <button id="reset-campaign-btn" class="danger">🔄 Сбросить кампанию</button>
             <button id="fullscreen-btn">⛶ На весь экран</button>
@@ -35,12 +35,25 @@
             <div class="queue-label">Очередь запуска (нажмите, чтобы настроить):</div>
             <div id="satellite-queue" class="queue-container"></div>
 
-            <!-- Панель настройки выбранного в очереди спутника -->
+            <!-- Панель настройки спутника -->
             <div id="setup-panel" class="hidden">
                 <div class="setup-title">Настройка SAT-<span id="setup-id">1</span></div>
-                <div class="control-group">
-                    <label for="setup-altitude">Высота: <span id="setup-altitude-value">400</span> км</label>
-                    <input type="range" id="setup-altitude" min="200" max="800" value="400" step="10">
+                <div class="setup-grid">
+                    <div class="control-group">
+                        <label>Высота: <span id="setup-alt-val">400</span> км</label>
+                        <input type="range" id="setup-alt" min="200" max="800" value="400" step="10">
+                    </div>
+                    <div class="control-group">
+                        <label>Наклон: <span id="setup-inc-val">0</span>°</label>
+                        <input type="range" id="setup-inc" min="0" max="90" value="0" step="10">
+                    </div>
+                    <div class="control-group">
+                        <label>Обзор: <span id="setup-cam-val">Стандарт</span></label>
+                        <input type="range" id="setup-cam" min="0" max="2" value="1" step="1">
+                    </div>
+                </div>
+                <div class="button-row" style="margin-top: 5px;">
+                    <button id="setup-engine" class="engine-btn">Двигатель: Хим (мощный)</button>
                 </div>
             </div>
 
@@ -49,12 +62,10 @@
                     <label for="impulse">Импульс: <span id="impulse-value">50</span>%</label>
                     <input type="range" id="impulse" min="10" max="100" value="50" step="1">
                 </div>
-
                 <div class="control-group">
                     <label for="count">Кол-во: <span id="count-value">3</span></label>
                     <input type="range" id="count" min="1" max="8" value="3" step="1">
                 </div>
-
                 <div class="control-group">
                     <label for="interval">Интервал: <span id="interval-value">4</span> с</label>
                     <input type="range" id="interval" min="1" max="15" value="4" step="1">
@@ -76,11 +87,25 @@
             <div>Запущено: <span id="launched-value">0 / 3</span></div>
             <div>Столкновений: <span id="collision-value">0</span></div>
             <div>ΔV: <span id="dv-value">0</span></div>
+            <div>Покрытие: <span id="coverage-value">0%</span></div>
             <div id="selected-info" class="hidden">Выбран: <span id="selected-value">—</span></div>
         </section>
 
-        <!-- Панель достижений -->
-        <div id="achievements-screen" class="hidden">
+        <!-- Экран руководства -->
+        <div id="guide-screen" class="hidden modal-screen">
+            <h2>📖 Руководство пилота</h2>
+            <div class="guide-text">
+                <p><strong>1. Очередь:</strong> Нажимайте на кружки, чтобы настроить каждый спутник отдельно.</p>
+                <p><strong>2. Наклон орбиты (0°-90°):</strong> Спутники с разным наклоном не сталкиваются, но летают в разных плоскостях.</p>
+                <p><strong>3. Тень Земли:</strong> Когда спутник залетает за Землю (в тень), его батарея садится. Без энергии коррекция невозможна!</p>
+                <p><strong>4. Двигатели:</strong> Хим (мощный рывок, ест много энергии) или Ион (слабый, но экономичный).</p>
+                <p><strong>5. Радиус обзора:</strong> Чем больше камера, тем меньше «слепых зон» на Земле.</p>
+                <p><strong>Цель:</strong> Покрыть максимум поверхности Земли, не столкнув спутники.</p>
+            </div>
+            <button id="close-guide-btn">Понятно</button>
+        </div>
+
+        <div id="achievements-screen" class="hidden modal-screen">
             <h2>Достижения</h2>
             <ul id="achievements-list"></ul>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
@@ -89,8 +114,7 @@
             </div>
         </div>
 
-        <!-- Экран результата -->
-        <div id="result-screen" class="hidden">
+        <div id="result-screen" class="hidden modal-screen">
             <h2 id="result-title">Результат</h2>
             <p id="result-text"></p>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
