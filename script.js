@@ -492,4 +492,358 @@
                 ctx.beginPath();
                 ctx.setLineDash([5, 5]);
                 ctx.ellipse(cx, cy, targetR, targetR * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(0, 255,
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // Дуги
+        if (game.satellites.length >= 2) {
+            for (let i = 0; i < game.satellites.length; i++) {
+                const s1 = game.satellites[i];
+                const s2 = game.satellites[(i + 1) % game.satellites.length];
+                let angleDiff = Math.abs(s1.angle - s2.angle);
+                if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                const diffDeg = angleDiff * 180 / Math.PI;
+                
+                if (diffDeg < 30) {
+                    let arcColor = diffDeg < 10 ? '#ff4444' : '#ffaa00';
+                    const arcRadius = (s1.radius + s2.radius) / 2;
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, arcRadius, arcRadius * PERSPECTIVE_TILT, 0, s1.angle, s2.angle);
+                    ctx.strokeStyle = arcColor;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Следы
+        for (let i = 0; i < game.satellites.length; i++) {
+            const sat = game.satellites[i];
+            for (let t = 0; t < sat.trail.length; t++) {
+                const p = sat.trail[t];
+                const px = cx + Math.cos(p.angle) * p.radius;
+                const py = cy + Math.sin(p.angle) * p.radius * PERSPECTIVE_TILT;
+                const alpha = (t / sat.trail.length) * 0.4;
+                ctx.beginPath();
+                ctx.arc(px, py, 1 + (t / sat.trail.length) * 2, 0, Math.PI * 2);
+                ctx.fillStyle = sat === game.selectedSatellite ? `rgba(255,255,255,${alpha})` : `rgba(0,255,255,${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        // Мусор
+        for (let i = 0; i < game.debris.length; i++) {
+            const d = game.debris[i];
+            const x = cx + Math.cos(d.angle) * d.radius;
+            const y = cy + Math.sin(d.angle) * d.radius * PERSPECTIVE_TILT;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(d.angle * 3);
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(-4, -1, 8, 2);
+            ctx.fillRect(-1, -4, 2, 8);
+            ctx.restore();
+        }
+
+        // Спутники
+        for (let i = 0; i < game.satellites.length; i++) {
+            const sat = game.satellites[i];
+            const x = cx + Math.cos(sat.angle) * sat.radius;
+            const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
+
+            let satColor = '#00ffff';
+            if (sat.fuel <= 20) satColor = '#ffaa00';
+            if (sat.fuel <= 0) satColor = '#ff4444';
+            if (sat === game.selectedSatellite) satColor = '#ffffff';
+
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = satColor;
+            ctx.shadowBlur = sat === game.selectedSatellite ? 15 : 8;
+            ctx.shadowColor = satColor;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            if (sat === game.selectedSatellite) {
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+    }
+
+    // ============================================================
+    // ЦИКЛ И КЛИК
+    // ============================================================
+    let lastTime = performance.now();
+    function loop(now) {
+        const dt = Math.min((now - lastTime) / 1000, 0.1);
+        lastTime = now;
+        update(dt);
+        render();
+        requestAnimationFrame(loop);
+    }
+
+    function handleCanvasClick(event) {
+        if (!game.running || game.finished) return;
+        const rect = canvas.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const clickY = event.clientY - rect.top;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        let found = null;
+        for (let i = 0; i < game.satellites.length; i++) {
+            const sat = game.satellites[i];
+            const x = cx + Math.cos(sat.angle) * sat.radius;
+            const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
+            if (Math.hypot(clickX - x, clickY - y) < 25) { found = sat; break; }
+        }
+
+        if (found) {
+            if (game.selectedSatellite === found) clearSelection();
+            else {
+                game.selectedSatellite = found;
+                correctBtn.disabled = false;
+                correctBtn.style.background = '#0055aa';
+                correctBtn.style.borderColor = '#00ffff';
+            }
+        } else {
+            clearSelection();
+        }
+        updateSelectedInfo();
+        updateHint();
+    }
+
+    function clearSelection() {
+        game.selectedSatellite = null;
+        correctBtn.disabled = true;
+        correctBtn.style.background = '#333';
+        correctBtn.style.borderColor = '#555';
+        selectedInfo.classList.add('hidden');
+    }
+
+    // ============================================================
+    // КОРРЕКЦИЯ И ЗАВЕРШЕНИЕ
+    // ============================================================
+    function correctSelected() {
+        if (!game.selectedSatellite) return;
+        const sat = game.selectedSatellite;
+        if (sat.fuel < DV_PER_CORRECTION) {
+            showBanner('Нет топлива!');
+            return;
+        }
+        sat.fuel -= DV_PER_CORRECTION;
+        sat.spentDV += DV_PER_CORRECTION;
+        game.totalDV += DV_PER_CORRECTION;
+        game.correctionsMade = true;
+        sat.speedMultiplier = Math.min(2.0, sat.speedMultiplier + 0.15);
+        updateSelectedInfo();
+    }
+
+    function finishGame() {
+        game.running = false;
+        game.finished = true;
+
+        const success = game.collisions === 0 && game.satellites.length === game.totalSatellites;
+        let altitudeBonus = 0;
+        if (game.satellites.length === game.totalSatellites) {
+            const altitudes = game.satellites.map(s => Math.round(s.radius));
+            if (new Set(altitudes).size === game.totalSatellites) altitudeBonus = 50;
+        }
+        const fuelBonus = Math.max(0, 100 - game.totalDV);
+        const score = (game.satellites.length * 100) - (game.collisions * 200) + altitudeBonus + fuelBonus;
+        const isNewRecord = saveBestScore(score);
+
+        let message = success ? 'Миссия выполнена!' : (game.collisions > 0 ? 'Столкновения!' : 'Не все выведены.');
+        
+        if (success && game.collisions === 0) unlockAchievement('no_collisions');
+        if (success && !game.correctionsMade) unlockAchievement('no_corrections');
+        if (game.satellites.length >= 5) unlockAchievement('many_satellites');
+
+        const hasNext = game.currentLevel < CAMPAIGN.length - 1;
+        if (success && !hasNext) unlockAchievement('campaign_done');
+
+        resultTitle.textContent = success ? 'УСПЕХ' : 'НЕУДАЧА';
+        resultTitle.style.color = success ? '#00ff00' : '#ff4444';
+        
+        let resultHTML = `${message}<br><br><strong>Балл:</strong> ${score}<br>
+            Время: ${game.time.toFixed(1)} с<br>
+            Столкновений: ${game.collisions}<br>ΔV: ${game.totalDV}<br>
+            Бонус за высоты: ${altitudeBonus}<br>Бонус за экономию: ${fuelBonus}`;
+            
+        if (isNewRecord) resultHTML += '<br><div class="record-text">🏆 НОВЫЙ РЕКОРД!</div>';
+        
+        resultText.innerHTML = resultHTML;
+
+        if (success && hasNext) resultNextBtn.classList.remove('hidden');
+        else resultNextBtn.classList.add('hidden');
+
+        if (success && hasNext) {
+            game.currentLevel++;
+            saveProgress();
+        }
+
+        resultScreen.classList.remove('hidden');
+        startBtn.disabled = true;
+        pauseBtn.disabled = true;
+        clearSelection();
+        updateHint();
+    }
+
+    // ============================================================
+    // СТАРТ / СБРОС / ПАУЗА
+    // ============================================================
+    function startGame() {
+        if (game.running) return;
+
+        game.running = true;
+        game.paused = false;
+        game.finished = false;
+        game.time = 0;
+        game.lastLaunchTime = 0;
+        game.targetAltitude = parseInt(altitudeSlider.value, 10);
+        game.impulse = parseInt(impulseSlider.value, 10);
+        game.totalSatellites = parseInt(countSlider.value, 10);
+        game.launchInterval = parseInt(intervalSlider.value, 10);
+        game.satellites = [];
+        game.collisions = 0;
+        game.totalDV = 0;
+        game.debris = [];
+        game.debrisSpawned = false;
+        game.correctionsMade = false;
+
+        resultScreen.classList.add('hidden');
+        collisionValue.textContent = '0';
+        collisionValue.style.color = '#00ffff';
+        dvValue.textContent = '0';
+        launchedValue.textContent = '0 / ' + game.totalSatellites;
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'ПАУЗА';
+        clearSelection();
+        updateHint();
+
+        lastTime = performance.now();
+    }
+
+    function togglePause() {
+        if (!game.running || game.finished) return;
+        game.paused = !game.paused;
+        pauseBtn.textContent = game.paused ? 'ПРОДОЛЖИТЬ' : 'ПАУЗА';
+        updateHint();
+    }
+
+    function resetGame() {
+        game.running = false;
+        game.paused = false;
+        game.finished = false;
+        game.time = 0;
+        game.satellites = [];
+        game.collisions = 0;
+        game.totalDV = 0;
+        game.debris = [];
+        game.debrisSpawned = false;
+        game.correctionsMade = false;
+
+        resultScreen.classList.add('hidden');
+        timeValue.textContent = '0.0';
+        launchedValue.textContent = '0 / ' + parseInt(countSlider.value, 10);
+        collisionValue.textContent = '0';
+        collisionValue.style.color = '#00ffff';
+        dvValue.textContent = '0';
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        pauseBtn.textContent = 'ПАУЗА';
+        clearSelection();
+        updateHint();
+        render();
+    }
+
+    function nextMission() {
+        resultScreen.classList.add('hidden');
+        applyLevel();
+        resetGame();
+    }
+
+    function resetCampaign() {
+        if (!confirm('Начать кампанию с 1-го уровня?')) return;
+        game.currentLevel = 0;
+        saveProgress();
+        applyLevel();
+        resetGame();
+    }
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => alert("Ошибка fullscreen"));
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+
+    // ============================================================
+    // ОБРАБОТЧИКИ
+    // ============================================================
+    altitudeSlider.addEventListener('input', function () { altitudeValue.textContent = this.value; });
+    impulseSlider.addEventListener('input', function () { impulseValue.textContent = this.value; });
+    countSlider.addEventListener('input', function () {
+        countValue.textContent = this.value;
+        launchedValue.textContent = '0 / ' + this.value;
+    });
+    intervalSlider.addEventListener('input', function () { intervalValue.textContent = this.value; });
+
+    startBtn.addEventListener('click', startGame);
+    pauseBtn.addEventListener('click', togglePause);
+    if (correctBtn) correctBtn.addEventListener('click', correctSelected);
+    
+    resetBtn.addEventListener('click', resetGame);
+    resultResetBtn.addEventListener('click', resetGame);
+    resultNextBtn.addEventListener('click', nextMission);
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    
+    menuBtn.addEventListener('click', () => sideMenu.classList.toggle('hidden'));
+    closeMenuBtn.addEventListener('click', () => sideMenu.classList.add('hidden'));
+    
+    achievementsBtn.addEventListener('click', function () {
+        renderAchievements();
+        achievementsScreen.classList.remove('hidden');
+        sideMenu.classList.add('hidden');
+    });
+    closeAchievementsBtn.addEventListener('click', function () {
+        achievementsScreen.classList.add('hidden');
+    });
+    resetCampaignBtn.addEventListener('click', resetCampaign);
+    resetAllBtn.addEventListener('click', resetAllData);
+
+    canvas.addEventListener('click', handleCanvasClick);
+    canvas.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 1) {
+            handleCanvasClick({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+        }
+    }, { passive: true });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowRight') { impulseSlider.value = Math.min(100, parseInt(impulseSlider.value, 10) + 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
+        else if (e.key === 'ArrowLeft') { impulseSlider.value = Math.max(10, parseInt(impulseSlider.value, 10) - 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
+        else if (e.key === ' ') { if (!game.running) startGame(); else togglePause(); e.preventDefault(); }
+        else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') { resetGame(); e.preventDefault(); }
+        else if (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') { correctSelected(); e.preventDefault(); }
+    });
+
+    // ============================================================
+    // ИНИЦИАЛИЗАЦИЯ
+    // ============================================================
+    createStars();
+    createClouds();
+    loadData();
+    applyLevel();
+    resizeCanvas();
+    requestAnimationFrame(loop);
+})();
