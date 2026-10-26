@@ -162,13 +162,13 @@ html, body {
 
 .setup-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 8px;
 }
 
 .control-group label {
     display: block;
-    font-size: 10px;
+    font-size: 11px;
     margin-bottom: 2px;
     color: #aaa;
 }
@@ -197,8 +197,9 @@ html, body {
 
 .engine-btn {
     width: 100%;
-    padding: 6px;
-    font-size: 11px;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: bold;
     background: #333;
     border: 1px solid #ffaa00;
     color: #ffaa00;
@@ -292,7 +293,8 @@ html, body {
 }
 
 .modal-screen h2 { color: #00ffff; margin-bottom: 15px; }
-.modal-screen p { font-size: 13px; line-height: 1.5; margin-bottom: 10px; text-align: left;}
+.modal-screen p, .modal-screen li { font-size: 13px; line-height: 1.5; margin-bottom: 5px; text-align: left;}
+.modal-screen ul { margin-left: 20px; margin-bottom: 15px; }
 .modal-screen button { padding: 10px 20px; background: #0055aa; border: 1px solid #00ffff; color: #fff; border-radius: 5px; cursor: pointer; }
 
 #achievements-screen ul {
