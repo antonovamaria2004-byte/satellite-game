@@ -16,7 +16,7 @@
             <div id="mission-info">Миссия 1 / 5 — Запустить 2 спутника</div>
         </header>
 
-        <!-- Меню (должно быть скрыто по умолчанию) -->
+        <!-- Выезжающее меню -->
         <div id="side-menu" class="hidden">
             <button id="achievements-btn">🏆 Достижения</button>
             <button id="reset-campaign-btn" class="danger">🔄 Сбросить кампанию</button>
@@ -32,44 +32,54 @@
         </main>
 
         <section id="controls">
+            <!-- Выбор типа спутника (характеристики) -->
+            <div class="sat-types-row">
+                <button class="sat-type active" data-type="standard">Стандарт</button>
+                <button class="sat-type" data-type="fast">Быстрый (мало топлива)</button>
+                <button class="sat-type" data-type="heavy">Тяжёлый (много топлива)</button>
+            </div>
+
             <div class="sliders-grid">
                 <div class="control-group">
                     <label for="altitude">Высота: <span id="altitude-value">400</span> км</label>
                     <input type="range" id="altitude" min="200" max="800" value="400" step="10">
                 </div>
+
                 <div class="control-group">
                     <label for="impulse">Импульс: <span id="impulse-value">50</span>%</label>
                     <input type="range" id="impulse" min="10" max="100" value="50" step="1">
                 </div>
+
                 <div class="control-group">
-                    <label for="count">Кол-во: <span id="count-value">2</span></label>
-                    <input type="range" id="count" min="1" max="8" value="2" step="1">
+                    <label for="count">Кол-во: <span id="count-value">3</span></label>
+                    <input type="range" id="count" min="1" max="8" value="3" step="1">
                 </div>
+
                 <div class="control-group">
-                    <label for="interval">Интервал: <span id="interval-value">5</span> с</label>
-                    <input type="range" id="interval" min="1" max="15" value="5" step="1">
+                    <label for="interval">Интервал: <span id="interval-value">4</span> с</label>
+                    <input type="range" id="interval" min="1" max="15" value="4" step="1">
                 </div>
             </div>
 
             <div class="button-row main-actions">
                 <button id="start-btn" class="primary">ЗАПУСК</button>
                 <button id="pause-btn" disabled>ПАУЗА</button>
-                <button id="correct-btn" disabled style="background:#333; border-color:#555;">КОРРЕКЦИЯ</button>
                 <button id="reset-btn">ЗАНОВО</button>
             </div>
         </section>
 
-        <div id="hint-bar">Настройте параметры и нажмите «Запуск».</div>
+        <div id="hint-bar">Нажмите «Запуск», чтобы начать миссию</div>
 
         <section id="telemetry">
             <div>Время: <span id="time-value">0.0</span> с</div>
-            <div>Запущено: <span id="launched-value">0 / 2</span></div>
+            <div>Запущено: <span id="launched-value">0 / 3</span></div>
             <div>Столкновений: <span id="collision-value">0</span></div>
             <div>ΔV: <span id="dv-value">0</span></div>
             <div id="selected-info" class="hidden">Выбран: <span id="selected-value">—</span></div>
         </section>
 
-        <div id="achievements-screen" class="hidden modal-screen">
+        <!-- Панель достижений -->
+        <div id="achievements-screen" class="hidden">
             <h2>Достижения</h2>
             <ul id="achievements-list"></ul>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
@@ -78,7 +88,8 @@
             </div>
         </div>
 
-        <div id="result-screen" class="hidden modal-screen">
+        <!-- Экран результата -->
+        <div id="result-screen" class="hidden">
             <h2 id="result-title">Результат</h2>
             <p id="result-text"></p>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
