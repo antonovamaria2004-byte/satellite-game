@@ -21,13 +21,6 @@
         { id: 'dodger', name: 'Уклонист', desc: 'Пережить космический мусор' }
     ];
 
-    // Характеристики спутников
-    const SAT_TYPES = {
-        standard: { name: 'Стандарт', fuel: 100, speed: 1.0 },
-        fast:     { name: 'Быстрый',  fuel: 40,  speed: 1.4 },
-        heavy:    { name: 'Тяжёлый',  fuel: 180, speed: 0.7 }
-    };
-
     const PERSPECTIVE_TILT = 0.45;
     const DV_PER_CORRECTION = 10;
     const DEBRIS_SPAWN_CHANCE = 0.008;
@@ -35,8 +28,7 @@
     // --- DOM ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const altitudeSlider = document.getElementById('altitude');
-    const altitudeValue = document.getElementById('altitude-value');
+    
     const impulseSlider = document.getElementById('impulse');
     const impulseValue = document.getElementById('impulse-value');
     const countSlider = document.getElementById('count');
@@ -73,7 +65,13 @@
     const resultText = document.getElementById('result-text');
     const resultNextBtn = document.getElementById('result-next-btn');
     const resultResetBtn = document.getElementById('result-reset-btn');
-    const satTypeBtns = document.querySelectorAll('.sat-type');
+    const queueContainer = document.getElementById('satellite-queue');
+    
+    const setupPanel = document.getElementById('setup-panel');
+    const setupId = document.getElementById('setup-id');
+    const setupAlt = document.getElementById('setup-alt');
+    const setupAltVal = document.getElementById('setup-alt-val');
+    const setupEngineBtn = document.getElementById('setup-engine');
 
     // --- Состояние ---
     const game = {
@@ -100,7 +98,8 @@
         unlockedAchievements: {},
         correctionsMade: false,
         bestScore: 0,
-        selectedSatType: 'standard'
+        launchQueue: [],
+        selectedQueueIndex: -1
     };
 
     // ============================================================
@@ -173,6 +172,73 @@
     }
 
     // ============================================================
+    // ОЧЕРЕДЬ И НАСТРОЙКА
+    // ============================================================
+    function initQueue(count) {
+        game.launchQueue = [];
+        const missionAlt = CAMPAIGN[game.currentLevel]?.altitude || 400;
+        
+        for (let i = 0; i < count; i++) {
+            game.launchQueue.push({ 
+                altitude: missionAlt + (i * 30),
+                engine: 'chem' 
+            });
+        }
+        game.selectedQueueIndex = -1;
+        setupPanel.classList.add('hidden');
+        renderQueue();
+    }
+
+    function renderQueue() {
+        queueContainer.innerHTML = '';
+        for (let i = 0; i < game.totalSatellites; i++) {
+            const btn = document.createElement('button');
+            const item = game.launchQueue[i];
+            btn.className = `queue-btn`;
+            btn.textContent = i + 1;
+            
+            if (i === game.selectedQueueIndex) btn.classList.add('selected-for-setup');
+            
+            if (i < game.satellites.length && game.running) {
+                btn.disabled = true;
+            } else if (!game.running) {
+                btn.onclick = () => {
+                    game.selectedQueueIndex = i;
+                    renderQueue();
+                    updateSetupPanel();
+                };
+            }
+            queueContainer.appendChild(btn);
+        }
+    }
+
+    function updateSetupPanel() {
+        if (game.selectedQueueIndex === -1 || game.running) {
+            setupPanel.classList.add('hidden');
+            return;
+        }
+        
+        const item = game.launchQueue[game.selectedQueueIndex];
+        setupPanel.classList.remove('hidden');
+        setupId.textContent = game.selectedQueueIndex + 1;
+        setupAlt.value = item.altitude;
+        setupAltVal.textContent = item.altitude;
+        setupEngineBtn.textContent = item.engine === 'chem' ? 'Двигатель: Хим (мощный)' : 'Двигатель: Ион (эконом)';
+    }
+
+    setupAlt.addEventListener('input', function() {
+        game.launchQueue[game.selectedQueueIndex].altitude = parseInt(this.value);
+        setupAltVal.textContent = this.value;
+        if (!game.running) render();
+    });
+
+    setupEngineBtn.addEventListener('click', function() {
+        const item = game.launchQueue[game.selectedQueueIndex];
+        item.engine = item.engine === 'chem' ? 'ion' : 'chem';
+        updateSetupPanel();
+    });
+
+    // ============================================================
     // UX ПОДСКАЗКИ
     // ============================================================
     function updateHint() {
@@ -185,16 +251,16 @@
             return;
         }
         if (!game.running) {
-            hintBar.textContent = 'Настройте спутник и нажмите «Запуск».';
+            hintBar.textContent = 'Настройте спутники и нажмите «Запуск».';
             startBtn.classList.add('glow');
             return;
         }
         startBtn.classList.remove('glow');
 
         if (game.selectedSatellite) {
-            hintBar.textContent = 'Нажмите «Коррекция» для ускорения (тратит топливо).';
+            hintBar.textContent = 'Спутник выбран. Нажмите «Коррекция» (C).';
         } else {
-            hintBar.textContent = 'Тапните по спутнику на орбите, чтобы выбрать его.';
+            hintBar.textContent = 'Тапните по спутнику, чтобы выбрать его.';
         }
     }
 
@@ -218,8 +284,6 @@
         const level = CAMPAIGN[game.currentLevel];
         if (!level) return;
 
-        altitudeSlider.value = level.altitude;
-        altitudeValue.textContent = level.altitude;
         countSlider.value = level.count;
         countValue.textContent = level.count;
         intervalSlider.value = level.interval;
@@ -231,6 +295,8 @@
 
         missionInfo.textContent = 'Миссия ' + (game.currentLevel + 1) + ' / ' + CAMPAIGN.length + ' — ' + level.title;
         launchedValue.textContent = '0 / ' + level.count;
+        
+        initQueue(level.count);
         updateHint();
     }
 
@@ -254,7 +320,7 @@
         for (let i = 0; i < 6; i++) {
             game.clouds.push({
                 angle: Math.random() * Math.PI * 2,
-                dist: Math.random() * 0.5 + 0.1, // расстояние от центра (0..1)
+                dist: Math.random() * 0.5 + 0.1,
                 size: Math.random() * 15 + 10,
                 speed: (Math.random() * 0.2 + 0.1) * (Math.random() > 0.5 ? 1 : -1),
                 opacity: Math.random() * 0.3 + 0.1
@@ -277,23 +343,18 @@
         const impulseFactor = game.impulse / 100;
         const startRadius = 40 + impulseFactor * 60;
         const startAngle = (Math.PI * 2 / game.totalSatellites) * index;
-        const heightStep = game.totalSatellites > 4 ? 20 : 30;
-        const altitudeOffset = index * heightStep;
-        
-        const typeParams = SAT_TYPES[game.selectedSatType];
+        const queueItem = game.launchQueue[index];
 
         return {
             id: index + 1,
             angle: startAngle,
             radius: startRadius,
-            targetRadius: game.earthRadius + (game.targetAltitude + altitudeOffset) / 10,
-            altitudeOffset: altitudeOffset,
-            baseSpeed: (0.8 + impulseFactor * 1.2) * typeParams.speed,
+            targetRadius: game.earthRadius + queueItem.altitude / 10,
+            engineType: queueItem.engine,
+            baseSpeed: (0.8 + impulseFactor * 1.2),
             speedMultiplier: 1.0,
-            maxFuel: typeParams.fuel,
-            fuel: typeParams.fuel,
-            spentDV: 0,
-            typeName: typeParams.name,
+            maxFuel: 150,
+            fuel: 150,
             trail: []
         };
     }
@@ -332,7 +393,6 @@
 
         game.time += dt;
 
-        // Вращение облаков
         for (let c of game.clouds) {
             c.angle += c.speed * dt;
         }
@@ -344,6 +404,7 @@
             game.lastLaunchTime = game.time;
             launchedValue.textContent = game.satellites.length + ' / ' + game.totalSatellites;
             if (game.satellites.length === 1) unlockAchievement('first_launch');
+            renderQueue();
         }
 
         if (!game.debrisSpawned && Math.random() < DEBRIS_SPAWN_CHANCE) {
@@ -388,9 +449,9 @@
         }
         const altitudeKm = Math.round((sat.radius - game.earthRadius) * 10);
         const speedPercent = Math.round(sat.speedMultiplier * 100);
-        const fuelPercent = Math.round((sat.fuel / sat.maxFuel) * 100);
+        const engName = sat.engineType === 'chem' ? 'Хим' : 'Ион';
         selectedValue.textContent = 
-            `SAT-${sat.id} (${sat.typeName}) | Выс: ${altitudeKm}км | Скор: ${speedPercent}% | Топл: ${fuelPercent}%`;
+            `SAT-${sat.id} (${engName}) | Выс: ${altitudeKm}км | Скор: ${speedPercent}% | Топл: ${Math.round(sat.fuel)}`;
         selectedInfo.classList.remove('hidden');
     }
 
@@ -434,14 +495,12 @@
         }
         ctx.globalAlpha = 1.0;
 
-        // --- КРАСИВАЯ ЗЕМЛЯ ---
-        // 1. Тень
+        // Земля
         ctx.beginPath();
         ctx.arc(cx + 4, cy + 6, game.earthRadius, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.fill();
 
-        // 2. Основной шар (градиент)
         const earthGrad = ctx.createRadialGradient(
             cx - game.earthRadius * 0.4, cy - game.earthRadius * 0.4, game.earthRadius * 0.1,
             cx, cy, game.earthRadius
@@ -454,21 +513,19 @@
         ctx.fillStyle = earthGrad;
         ctx.fill();
 
-        // 3. Континенты (случайные пятна)
+        // Континенты
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, game.earthRadius, 0, Math.PI * 2);
-        ctx.clip(); // Обрезаем всё, что выходит за пределы Земли
-
-        ctx.fillStyle = 'rgba(40, 160, 80, 0.6)'; // Зелёный цвет
-        // Рисуем несколько "континентов" в виде кривых Безье
+        ctx.clip();
+        ctx.fillStyle = 'rgba(40, 160, 80, 0.6)';
         ctx.beginPath();
         ctx.ellipse(cx - 20, cy - 15, 25, 15, 0.5, 0, Math.PI * 2);
         ctx.ellipse(cx + 15, cy + 10, 30, 20, -0.3, 0, Math.PI * 2);
         ctx.ellipse(cx - 5, cy + 30, 15, 10, 0.8, 0, Math.PI * 2);
         ctx.fill();
 
-        // 4. Облака (движущиеся)
+        // Облака
         ctx.fillStyle = '#ffffff';
         for (let c of game.clouds) {
             const dx = Math.cos(c.angle) * game.earthRadius * c.dist;
@@ -479,9 +536,9 @@
             ctx.fill();
         }
         ctx.globalAlpha = 1.0;
-        ctx.restore(); // Возвращаем обрезку
+        ctx.restore();
 
-        // 5. Блик
+        // Блик
         const highlightGrad = ctx.createRadialGradient(
             cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, 0,
             cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, game.earthRadius * 0.5
@@ -493,7 +550,7 @@
         ctx.fillStyle = highlightGrad;
         ctx.fill();
 
-        // 6. Атмосфера
+        // Атмосфера
         const haloGrad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 30);
         haloGrad.addColorStop(0, 'rgba(0, 255, 255, 0.25)');
         haloGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
@@ -502,21 +559,25 @@
         ctx.fillStyle = haloGrad;
         ctx.fill();
 
-        // --- ОРБИТЫ И СПУТНИКИ ---
-        if (game.running && game.satellites.length > 0) {
-            for (let i = 0; i < game.satellites.length; i++) {
-                const targetR = game.satellites[i].targetRadius;
-                ctx.beginPath();
-                ctx.setLineDash([5, 5]);
-                ctx.ellipse(cx, cy, targetR, targetR * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
+        // Пунктирные орбиты
+        for (let i = 0; i < game.launchQueue.length; i++) {
+            if (i < game.satellites.length && game.running) continue; 
+            const item = game.launchQueue[i];
+            if (!item) continue;
+            const targetR = game.earthRadius + item.altitude / 10;
+            
+            const isSelected = (i === game.selectedQueueIndex && !game.running);
+            
+            ctx.beginPath();
+            ctx.setLineDash(isSelected ? [10, 5] : [5, 5]);
+            ctx.ellipse(cx, cy, targetR, targetR * PERSPECTIVE_TILT, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = isSelected ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 255, 255, 0.15)';
+            ctx.lineWidth = isSelected ? 2 : 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
 
-        // Дуги
+        // Дуги опасности
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
@@ -533,14 +594,6 @@
                     ctx.strokeStyle = arcColor;
                     ctx.lineWidth = 2;
                     ctx.stroke();
-                    
-                    let midAngle = (s1.angle + s2.angle) / 2;
-                    if (Math.abs(s1.angle - s2.angle) > Math.PI) midAngle += Math.PI;
-                    const tx = cx + Math.cos(midAngle) * arcRadius;
-                    const ty = cy + Math.sin(midAngle) * arcRadius * PERSPECTIVE_TILT;
-                    ctx.fillStyle = arcColor;
-                    ctx.font = 'bold 10px Courier New';
-                    ctx.fillText(diffDeg.toFixed(0) + '°', tx - 10, ty);
                 }
             }
         }
@@ -581,8 +634,8 @@
             const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
 
             let satColor = '#00ffff';
-            if (sat.fuel / sat.maxFuel <= 0.2) satColor = '#ffaa00';
-            if (sat.fuel <= 0) satColor = '#ff4444';
+            if (sat.engineType === 'ion') satColor = '#ffaa00'; // Ионные - жёлтые
+            if (sat.fuel <= 20) satColor = '#ff4444';
             if (sat === game.selectedSatellite) satColor = '#ffffff';
 
             ctx.beginPath();
@@ -635,8 +688,6 @@
             if (game.selectedSatellite === found) clearSelection();
             else {
                 game.selectedSatellite = found;
-                document.getElementById('correct-btn')?.removeAttribute('disabled');
-                if (document.getElementById('correct-btn')) document.getElementById('correct-btn').disabled = false;
             }
         } else {
             clearSelection();
@@ -647,7 +698,6 @@
 
     function clearSelection() {
         game.selectedSatellite = null;
-        if (document.getElementById('correct-btn')) document.getElementById('correct-btn').disabled = true;
         selectedInfo.classList.add('hidden');
     }
 
@@ -657,15 +707,19 @@
     function correctSelected() {
         if (!game.selectedSatellite) return;
         const sat = game.selectedSatellite;
-        if (sat.fuel < DV_PER_CORRECTION) {
+        
+        const fuelCost = sat.engineType === 'chem' ? 20 : 2;
+        const speedGain = sat.engineType === 'chem' ? 0.2 : 0.02;
+
+        if (sat.fuel < fuelCost) {
             showBanner('Нет топлива!');
             return;
         }
-        sat.fuel -= DV_PER_CORRECTION;
-        sat.spentDV += DV_PER_CORRECTION;
-        game.totalDV += DV_PER_CORRECTION;
+        
+        sat.fuel -= fuelCost;
+        game.totalDV += fuelCost;
         game.correctionsMade = true;
-        sat.speedMultiplier = Math.min(2.0, sat.speedMultiplier + 0.15);
+        sat.speedMultiplier = Math.min(3.0, sat.speedMultiplier + speedGain);
         updateSelectedInfo();
     }
 
@@ -730,16 +784,22 @@
         game.finished = false;
         game.time = 0;
         game.lastLaunchTime = 0;
-        game.targetAltitude = parseInt(altitudeSlider.value, 10);
         game.impulse = parseInt(impulseSlider.value, 10);
-        game.totalSatellites = parseInt(countSlider.value, 10);
         game.launchInterval = parseInt(intervalSlider.value, 10);
+        
+        const sliderCount = parseInt(countSlider.value, 10);
+        if (sliderCount !== game.totalSatellites) {
+             game.totalSatellites = sliderCount;
+             initQueue(sliderCount);
+        }
+
         game.satellites = [];
         game.collisions = 0;
         game.totalDV = 0;
         game.debris = [];
         game.debrisSpawned = false;
         game.correctionsMade = false;
+        game.selectedQueueIndex = -1;
 
         resultScreen.classList.add('hidden');
         collisionValue.textContent = '0';
@@ -751,6 +811,8 @@
         pauseBtn.textContent = 'ПАУЗА';
         clearSelection();
         updateHint();
+        renderQueue();
+        setupPanel.classList.add('hidden');
 
         lastTime = performance.now();
     }
@@ -773,6 +835,7 @@
         game.debris = [];
         game.debrisSpawned = false;
         game.correctionsMade = false;
+        game.selectedQueueIndex = -1;
 
         resultScreen.classList.add('hidden');
         timeValue.textContent = '0.0';
@@ -785,6 +848,8 @@
         pauseBtn.textContent = 'ПАУЗА';
         clearSelection();
         updateHint();
+        renderQueue();
+        setupPanel.classList.add('hidden');
         render();
     }
 
@@ -813,36 +878,22 @@
     // ============================================================
     // ОБРАБОТЧИКИ
     // ============================================================
-    
-    // Выбор типа спутника
-    satTypeBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            satTypeBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            game.selectedSatType = btn.dataset.type;
-        });
-    });
-
-    altitudeSlider.addEventListener('input', function () { altitudeValue.textContent = this.value; });
     impulseSlider.addEventListener('input', function () { impulseValue.textContent = this.value; });
     countSlider.addEventListener('input', function () {
         countValue.textContent = this.value;
         launchedValue.textContent = '0 / ' + this.value;
+        game.totalSatellites = parseInt(this.value, 10);
+        initQueue(game.totalSatellites); 
     });
     intervalSlider.addEventListener('input', function () { intervalValue.textContent = this.value; });
 
     startBtn.addEventListener('click', startGame);
     pauseBtn.addEventListener('click', togglePause);
-    // Кнопка коррекции вешается на документ, так как мы убрали её из HTML (она теперь внутри телеметрии или появляется при выборе)
-    const correctBtn = document.getElementById('correct-btn'); 
-    if (correctBtn) correctBtn.addEventListener('click', correctSelected);
-    
     resetBtn.addEventListener('click', resetGame);
     resultResetBtn.addEventListener('click', resetGame);
     resultNextBtn.addEventListener('click', nextMission);
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     
-    // Меню
     menuBtn.addEventListener('click', () => sideMenu.classList.toggle('hidden'));
     closeMenuBtn.addEventListener('click', () => sideMenu.classList.add('hidden'));
     
@@ -865,9 +916,7 @@
     }, { passive: true });
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowUp') { altitudeSlider.value = Math.min(800, parseInt(altitudeSlider.value, 10) + 10); altitudeValue.textContent = altitudeSlider.value; e.preventDefault(); }
-        else if (e.key === 'ArrowDown') { altitudeSlider.value = Math.max(200, parseInt(altitudeSlider.value, 10) - 10); altitudeValue.textContent = altitudeSlider.value; e.preventDefault(); }
-        else if (e.key === 'ArrowRight') { impulseSlider.value = Math.min(100, parseInt(impulseSlider.value, 10) + 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
+        if (e.key === 'ArrowRight') { impulseSlider.value = Math.min(100, parseInt(impulseSlider.value, 10) + 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { impulseSlider.value = Math.max(10, parseInt(impulseSlider.value, 10) - 5); impulseValue.textContent = impulseSlider.value; e.preventDefault(); }
         else if (e.key === ' ') { if (!game.running) startGame(); else togglePause(); e.preventDefault(); }
         else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') { resetGame(); e.preventDefault(); }
