@@ -1,9 +1,6 @@
 (function () {
     'use strict';
 
-    // ============================================================
-    // КАМПАНИЯ
-    // ============================================================
     const CAMPAIGN = [
         { count: 2, interval: 5, altitude: 300, title: 'Запустить 2 спутника' },
         { count: 3, interval: 4, altitude: 400, title: 'Запустить 3 спутника' },
@@ -25,7 +22,6 @@
     const DV_PER_CORRECTION = 10;
     const DEBRIS_SPAWN_CHANCE = 0.008;
 
-    // --- DOM ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     
@@ -73,7 +69,6 @@
     const setupAltVal = document.getElementById('setup-alt-val');
     const setupEngineBtn = document.getElementById('setup-engine');
 
-    // --- Состояние ---
     const game = {
         running: false,
         paused: false,
@@ -102,9 +97,6 @@
         selectedQueueIndex: -1
     };
 
-    // ============================================================
-    // СОХРАНЕНИЕ
-    // ============================================================
     function loadData() {
         try {
             const savedAch = localStorage.getItem('satellite_achievements');
@@ -138,9 +130,6 @@
         try { localStorage.setItem('satellite_campaign_level', game.currentLevel); } catch (e) {}
     }
 
-    // ============================================================
-    // ДОСТИЖЕНИЯ И МЕНЮ
-    // ============================================================
     function unlockAchievement(id) {
         if (game.unlockedAchievements[id]) return;
         game.unlockedAchievements[id] = true;
@@ -171,9 +160,6 @@
         showBanner('Все данные сброшены');
     }
 
-    // ============================================================
-    // ОЧЕРЕДЬ И НАСТРОЙКА
-    // ============================================================
     function initQueue(count) {
         game.launchQueue = [];
         const missionAlt = CAMPAIGN[game.currentLevel]?.altitude || 400;
@@ -193,7 +179,6 @@
         queueContainer.innerHTML = '';
         for (let i = 0; i < game.totalSatellites; i++) {
             const btn = document.createElement('button');
-            const item = game.launchQueue[i];
             btn.className = `queue-btn`;
             btn.textContent = i + 1;
             
@@ -238,9 +223,6 @@
         updateSetupPanel();
     });
 
-    // ============================================================
-    // UX ПОДСКАЗКИ
-    // ============================================================
     function updateHint() {
         if (game.finished) {
             hintBar.textContent = 'Миссия завершена.';
@@ -264,9 +246,6 @@
         }
     }
 
-    // ============================================================
-    // БАННЕР
-    // ============================================================
     let bannerTimer = null;
     function showBanner(text) {
         eventText.textContent = text;
@@ -277,9 +256,6 @@
         }, 2500);
     }
 
-    // ============================================================
-    // УРОВНИ
-    // ============================================================
     function applyLevel() {
         const level = CAMPAIGN[game.currentLevel];
         if (!level) return;
@@ -300,9 +276,6 @@
         updateHint();
     }
 
-    // ============================================================
-    // ЗВЁЗДЫ И ОБЛАКА
-    // ============================================================
     function createStars() {
         game.stars = [];
         for (let i = 0; i < 150; i++) {
@@ -336,9 +309,6 @@
     }
     window.addEventListener('resize', resizeCanvas);
 
-    // ============================================================
-    // СПУТНИКИ
-    // ============================================================
     function createSatellite(index) {
         const impulseFactor = game.impulse / 100;
         const startRadius = 40 + impulseFactor * 60;
@@ -359,9 +329,6 @@
         };
     }
 
-    // ============================================================
-    // МУСОР
-    // ============================================================
     function spawnDebris() {
         const angle = Math.random() * Math.PI * 2;
         const radius = 150 + Math.random() * 200;
@@ -385,9 +352,6 @@
         }
     }
 
-    // ============================================================
-    // ЛОГИКА
-    // ============================================================
     function update(dt) {
         if (!game.running || game.finished || game.paused) return;
 
@@ -474,15 +438,11 @@
         }
     }
 
-    // ============================================================
-    // ОТРИСОВКА
-    // ============================================================
     function render() {
         const w = canvas.width, h = canvas.height;
         const cx = w / 2, cy = h / 2;
         ctx.clearRect(0, 0, w, h);
 
-        // Звёзды
         const tSec = performance.now() / 1000;
         for (let i = 0; i < game.stars.length; i++) {
             const st = game.stars[i];
@@ -495,7 +455,6 @@
         }
         ctx.globalAlpha = 1.0;
 
-        // Земля
         ctx.beginPath();
         ctx.arc(cx + 4, cy + 6, game.earthRadius, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -513,7 +472,6 @@
         ctx.fillStyle = earthGrad;
         ctx.fill();
 
-        // Континенты
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, game.earthRadius, 0, Math.PI * 2);
@@ -525,7 +483,6 @@
         ctx.ellipse(cx - 5, cy + 30, 15, 10, 0.8, 0, Math.PI * 2);
         ctx.fill();
 
-        // Облака
         ctx.fillStyle = '#ffffff';
         for (let c of game.clouds) {
             const dx = Math.cos(c.angle) * game.earthRadius * c.dist;
@@ -538,7 +495,6 @@
         ctx.globalAlpha = 1.0;
         ctx.restore();
 
-        // Блик
         const highlightGrad = ctx.createRadialGradient(
             cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, 0,
             cx - game.earthRadius * 0.45, cy - game.earthRadius * 0.45, game.earthRadius * 0.5
@@ -550,7 +506,6 @@
         ctx.fillStyle = highlightGrad;
         ctx.fill();
 
-        // Атмосфера
         const haloGrad = ctx.createRadialGradient(cx, cy, game.earthRadius, cx, cy, game.earthRadius + 30);
         haloGrad.addColorStop(0, 'rgba(0, 255, 255, 0.25)');
         haloGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
@@ -559,7 +514,6 @@
         ctx.fillStyle = haloGrad;
         ctx.fill();
 
-        // Пунктирные орбиты
         for (let i = 0; i < game.launchQueue.length; i++) {
             if (i < game.satellites.length && game.running) continue; 
             const item = game.launchQueue[i];
@@ -577,7 +531,6 @@
             ctx.setLineDash([]);
         }
 
-        // Дуги опасности
         if (game.satellites.length >= 2) {
             for (let i = 0; i < game.satellites.length; i++) {
                 const s1 = game.satellites[i];
@@ -598,7 +551,6 @@
             }
         }
 
-        // Следы
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             for (let t = 0; t < sat.trail.length; t++) {
@@ -613,7 +565,6 @@
             }
         }
 
-        // Мусор
         for (let i = 0; i < game.debris.length; i++) {
             const d = game.debris[i];
             const x = cx + Math.cos(d.angle) * d.radius;
@@ -627,14 +578,13 @@
             ctx.restore();
         }
 
-        // Спутники
         for (let i = 0; i < game.satellites.length; i++) {
             const sat = game.satellites[i];
             const x = cx + Math.cos(sat.angle) * sat.radius;
             const y = cy + Math.sin(sat.angle) * sat.radius * PERSPECTIVE_TILT;
 
             let satColor = '#00ffff';
-            if (sat.engineType === 'ion') satColor = '#ffaa00'; // Ионные - жёлтые
+            if (sat.engineType === 'ion') satColor = '#ffaa00'; 
             if (sat.fuel <= 20) satColor = '#ff4444';
             if (sat === game.selectedSatellite) satColor = '#ffffff';
 
@@ -656,9 +606,6 @@
         }
     }
 
-    // ============================================================
-    // ЦИКЛ И КЛИК
-    // ============================================================
     let lastTime = performance.now();
     function loop(now) {
         const dt = Math.min((now - lastTime) / 1000, 0.1);
@@ -701,9 +648,6 @@
         selectedInfo.classList.add('hidden');
     }
 
-    // ============================================================
-    // КОРРЕКЦИЯ И ЗАВЕРШЕНИЕ
-    // ============================================================
     function correctSelected() {
         if (!game.selectedSatellite) return;
         const sat = game.selectedSatellite;
@@ -773,9 +717,6 @@
         updateHint();
     }
 
-    // ============================================================
-    // СТАРТ / СБРОС / ПАУЗА
-    // ============================================================
     function startGame() {
         if (game.running) return;
 
@@ -875,9 +816,6 @@
         }
     }
 
-    // ============================================================
-    // ОБРАБОТЧИКИ
-    // ============================================================
     impulseSlider.addEventListener('input', function () { impulseValue.textContent = this.value; });
     countSlider.addEventListener('input', function () {
         countValue.textContent = this.value;
@@ -923,9 +861,6 @@
         else if (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') { correctSelected(); e.preventDefault(); }
     });
 
-    // ============================================================
-    // ИНИЦИАЛИЗАЦИЯ
-    // ============================================================
     createStars();
     createClouds();
     loadData();
