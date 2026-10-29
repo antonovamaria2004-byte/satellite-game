@@ -292,6 +292,10 @@ html, body {
     text-align: center;
 }
 
+.modal-screen.hidden {
+    display: none !important;
+}
+
 .modal-screen h2 { color: #00ffff; margin-bottom: 15px; }
 .modal-screen p { font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
 .modal-screen button { padding: 10px 20px; background: #0055aa; border: 1px solid #00ffff; color: #fff; border-radius: 5px; cursor: pointer; }
