@@ -32,11 +32,11 @@
         </main>
 
         <section id="controls">
-            <!-- Выбор типа спутника -->
+            <!-- Выбор типа спутника (характеристики) -->
             <div class="sat-types-row">
                 <button class="sat-type active" data-type="standard">Стандарт</button>
-                <button class="sat-type" data-type="fast">Быстрый</button>
-                <button class="sat-type" data-type="heavy">Тяжёлый</button>
+                <button class="sat-type" data-type="fast">Быстрый (мало топлива)</button>
+                <button class="sat-type" data-type="heavy">Тяжёлый (много топлива)</button>
             </div>
 
             <div class="sliders-grid">
@@ -44,14 +44,17 @@
                     <label for="altitude">Высота: <span id="altitude-value">400</span> км</label>
                     <input type="range" id="altitude" min="200" max="800" value="400" step="10">
                 </div>
+
                 <div class="control-group">
                     <label for="impulse">Импульс: <span id="impulse-value">50</span>%</label>
                     <input type="range" id="impulse" min="10" max="100" value="50" step="1">
                 </div>
+
                 <div class="control-group">
                     <label for="count">Кол-во: <span id="count-value">3</span></label>
                     <input type="range" id="count" min="1" max="8" value="3" step="1">
                 </div>
+
                 <div class="control-group">
                     <label for="interval">Интервал: <span id="interval-value">4</span> с</label>
                     <input type="range" id="interval" min="1" max="15" value="4" step="1">
@@ -76,7 +79,7 @@
         </section>
 
         <!-- Панель достижений -->
-        <div id="achievements-screen" class="hidden modal-screen">
+        <div id="achievements-screen" class="hidden">
             <h2>Достижения</h2>
             <ul id="achievements-list"></ul>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
@@ -86,7 +89,7 @@
         </div>
 
         <!-- Экран результата -->
-        <div id="result-screen" class="hidden modal-screen">
+        <div id="result-screen" class="hidden">
             <h2 id="result-title">Результат</h2>
             <p id="result-text"></p>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
