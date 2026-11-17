@@ -30,8 +30,8 @@
 
     const PERSPECTIVE_TILT = 0.45;
     const DV_PER_CORRECTION = 10;
-    const DEBRIS_SPAWN_CHANCE = 0.006; // вероятность появления мусора за кадр
-    const DEBRIS_HIT_RADIUS = 15;      // порог столкновения (пиксели)
+    const DEBRIS_SPAWN_CHANCE = 0.006;
+    const DEBRIS_HIT_RADIUS = 15;
 
     // --- DOM ---
     const canvas = document.getElementById('canvas');
@@ -69,6 +69,7 @@
     const dvValue = document.getElementById('dv-value');
     const selectedInfo = document.getElementById('selected-info');
     const selectedValue = document.getElementById('selected-value');
+    const correctBtn = document.getElementById('correct-btn');
     const resultScreen = document.getElementById('result-screen');
     const resultTitle = document.getElementById('result-title');
     const resultText = document.getElementById('result-text');
@@ -196,7 +197,7 @@
         startBtn.classList.remove('glow');
 
         if (game.selectedSatellite) {
-            hintBar.textContent = 'Нажмите «C» для коррекции (тратит топливо).';
+            hintBar.textContent = 'Нажмите «Коррекция» (или C), чтобы ускорить спутник. Остерегайтесь мусора!';
         } else {
             hintBar.textContent = 'Тапните по спутнику на орбите, чтобы выбрать его. Остерегайтесь мусора!';
         }
@@ -363,7 +364,7 @@
             c.angle += c.speed * dt;
         }
 
-        // Запуск новых спутников
+        // Запуск новых спутников (уничтоженные тоже считаются запущенными)
         if (game.satellites.length + game.collisions < game.totalSatellites &&
             game.time - game.lastLaunchTime >= game.launchInterval) {
             const newSat = createSatellite(game.satellites.length + game.collisions);
@@ -394,15 +395,14 @@
             if (sat.trail.length > 40) sat.trail.shift();
         }
 
-        checkCollisions();          // спутник-спутник
-        checkDebrisCollisions();    // мусор-спутник
+        checkCollisions();
+        checkDebrisCollisions();
         updateSelectedInfo();
         updateHint();
 
         timeValue.textContent = game.time.toFixed(1);
         dvValue.textContent = game.totalDV;
 
-        // Условие завершения: все спутники либо выведены, либо уничтожены
         const launchedTotal = game.satellites.length + game.collisions;
         if (launchedTotal >= game.totalSatellites && game.time >= game.flightTimeLimit) {
             finishGame();
@@ -412,6 +412,7 @@
     function updateSelectedInfo() {
         if (!game.selectedSatellite) {
             selectedInfo.classList.add('hidden');
+            if (correctBtn) correctBtn.disabled = true;
             return;
         }
         const sat = game.selectedSatellite;
@@ -425,6 +426,7 @@
         selectedValue.textContent =
             `SAT-${sat.id} (${sat.typeName}) | Выс: ${altitudeKm}км | Скор: ${speedPercent}% | Топл: ${fuelPercent}%`;
         selectedInfo.classList.remove('hidden');
+        if (correctBtn) correctBtn.disabled = sat.fuel < DV_PER_CORRECTION;
     }
 
     function checkCollisions() {
@@ -733,6 +735,7 @@
     function clearSelection() {
         game.selectedSatellite = null;
         selectedInfo.classList.add('hidden');
+        if (correctBtn) correctBtn.disabled = true;
     }
 
     // ============================================================
@@ -918,8 +921,6 @@
 
     startBtn.addEventListener('click', startGame);
     pauseBtn.addEventListener('click', togglePause);
-
-    const correctBtn = document.getElementById('correct-btn');
     if (correctBtn) correctBtn.addEventListener('click', correctSelected);
 
     resetBtn.addEventListener('click', resetGame);
